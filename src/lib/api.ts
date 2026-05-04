@@ -44,6 +44,13 @@ export const api = {
     remove: (id: number) => request('transactions', 'DELETE', undefined, { id: String(id) }),
   },
 
+  daily_reports: {
+    list: () => request('daily_reports'),
+    get: (id: number) => request('daily_reports', 'GET', undefined, { id: String(id) }),
+    create: (data: object) => request('daily_reports', 'POST', data),
+    remove: (id: number) => request('daily_reports', 'DELETE', undefined, { id: String(id) }),
+  },
+
   employees: {
     list: () => request('employees'),
     create: (data: object) => request('employees', 'POST', data),

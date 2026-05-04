@@ -49,6 +49,13 @@
       "path": "/?resource=employees",
       "expectedStatus": 200,
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get daily reports",
+      "method": "GET",
+      "path": "/?resource=daily_reports",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
     }
   ]
 }

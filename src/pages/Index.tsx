@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 type Section =
   | "dashboard" | "clients" | "bookings" | "quads"
   | "payments" | "reports" | "expenses" | "income"
-  | "calendar" | "employees" | "contacts";
+  | "calendar" | "employees" | "contacts" | "daily_reports";
 
 const navItems: { id: Section; label: string; icon: string }[] = [
   { id: "dashboard", label: "Дашборд", icon: "LayoutDashboard" },
@@ -17,6 +17,7 @@ const navItems: { id: Section; label: string; icon: string }[] = [
   { id: "income", label: "Доходы", icon: "TrendingUp" },
   { id: "expenses", label: "Расходы", icon: "TrendingDown" },
   { id: "reports", label: "Отчёты", icon: "BarChart3" },
+  { id: "daily_reports", label: "Дневные отчёты", icon: "FileText" },
   { id: "employees", label: "Сотрудники", icon: "UserCog" },
   { id: "contacts", label: "Контакты", icon: "Phone" },
 ];
@@ -850,6 +851,286 @@ function CalendarView() {
   );
 }
 
+// ── ДНЕВНЫЕ ОТЧЁТЫ ────────────────────────────────────────────
+
+interface TourRow { title: string; quads_info: string; amount: string; }
+interface ExpRow { title: string; amount: string; }
+
+const emptyTour = (): TourRow => ({ title: "", quads_info: "", amount: "" });
+const emptyExp = (): ExpRow => ({ title: "", amount: "" });
+
+function DailyReports() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [viewReport, setViewReport] = useState<any | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [point, setPoint] = useState("Находка");
+  const [totalCash, setTotalCash] = useState("");
+  const [notes, setNotes] = useState("");
+  const [tours, setTours] = useState<TourRow[]>([emptyTour()]);
+  const [exps, setExps] = useState<ExpRow[]>([emptyExp()]);
+
+  const load = useCallback(() => {
+    api.daily_reports.list().then(d => { setReports(d); setLoading(false); });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const toursTotal = tours.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+  const expsTotal = exps.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const remainder = toursTotal - expsTotal;
+
+  const openForm = () => {
+    setDate(today); setPoint("Находка"); setTotalCash(""); setNotes("");
+    setTours([emptyTour()]); setExps([emptyExp()]);
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    if (!point.trim()) return;
+    setSaving(true);
+    await api.daily_reports.create({
+      report_date: date,
+      point,
+      total_cash: parseFloat(totalCash) || toursTotal,
+      remainder,
+      notes,
+      tours: tours.filter(t => t.title.trim()).map(t => ({ ...t, amount: parseFloat(t.amount) || 0 })),
+      expenses: exps.filter(e => e.title.trim()).map(e => ({ ...e, amount: parseFloat(e.amount) || 0 })),
+    });
+    setSaving(false); setShowForm(false); load();
+  };
+
+  const remove = async (id: number) => {
+    await api.daily_reports.remove(id); setDeleteId(null); load();
+  };
+
+  const setTour = (i: number, field: keyof TourRow, val: string) =>
+    setTours(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: val } : t));
+  const setExp = (i: number, field: keyof ExpRow, val: string) =>
+    setExps(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e));
+
+  const fmtDate = (s: string) => { try { return new Date(s).toLocaleDateString("ru-RU"); } catch { return s; } };
+  const fmtMoney = (n: number) => `${Number(n).toLocaleString("ru-RU")} ₽`;
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="animate-fade-in space-y-6">
+      {/* Форма создания */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-2xl shadow-2xl animate-fade-in flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border flex-shrink-0">
+              <h2 className="font-display font-semibold text-foreground">Новый дневной отчёт</h2>
+              <button onClick={() => setShowForm(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><Icon name="X" size={16} /></button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+              {/* Шапка */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Дата</label>
+                  <input className={inputCls} type="date" value={date} onChange={e => setDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Точка</label>
+                  <select className={selectCls} value={point} onChange={e => setPoint(e.target.value)}>
+                    <option>Находка</option>
+                    <option>Волчанец</option>
+                    <option>Другая</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Туры */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold">Туры</span>
+                  <button onClick={() => setTours(p => [...p, emptyTour()])} className="text-xs text-primary hover:underline flex items-center gap-1"><Icon name="Plus" size={12} /> Добавить тур</button>
+                </div>
+                <div className="space-y-2">
+                  {tours.map((t, i) => (
+                    <div key={i} className="flex gap-2 items-start bg-muted/40 rounded-xl p-3">
+                      <div className="flex-1 space-y-2">
+                        <input className={inputCls} placeholder="Название (напр: Тур 1 час)" value={t.title} onChange={e => setTour(i, 'title', e.target.value)} />
+                        <div className="flex gap-2">
+                          <input className={inputCls} placeholder="Техника (300/300/200)" value={t.quads_info} onChange={e => setTour(i, 'quads_info', e.target.value)} />
+                          <input className={inputCls} type="number" placeholder="Сумма ₽" value={t.amount} onChange={e => setTour(i, 'amount', e.target.value)} style={{ width: 120 }} />
+                        </div>
+                      </div>
+                      {tours.length > 1 && (
+                        <button onClick={() => setTours(p => p.filter((_, idx) => idx !== i))} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors mt-1">
+                          <Icon name="Trash2" size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right text-sm font-semibold text-emerald-600 mt-2">Итого туры: {fmtMoney(toursTotal)}</div>
+              </div>
+
+              {/* Расходы */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold">Расходы</span>
+                  <button onClick={() => setExps(p => [...p, emptyExp()])} className="text-xs text-primary hover:underline flex items-center gap-1"><Icon name="Plus" size={12} /> Добавить расход</button>
+                </div>
+                <div className="space-y-2">
+                  {exps.map((e, i) => (
+                    <div key={i} className="flex gap-2 items-center bg-muted/40 rounded-xl px-3 py-2">
+                      <input className={inputCls + " flex-1"} placeholder="Описание (напр: ЗП инструктор)" value={e.title} onChange={ev => setExp(i, 'title', ev.target.value)} />
+                      <input className={inputCls} type="number" placeholder="Сумма ₽" value={e.amount} onChange={ev => setExp(i, 'amount', ev.target.value)} style={{ width: 120 }} />
+                      {exps.length > 1 && (
+                        <button onClick={() => setExps(p => p.filter((_, idx) => idx !== i))} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <Icon name="Trash2" size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right text-sm font-semibold text-red-500 mt-2">Итого расходы: {fmtMoney(expsTotal)}</div>
+              </div>
+
+              {/* Заметки */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Заметки</label>
+                <textarea className={inputCls} rows={2} placeholder="Дополнительно..." value={notes} onChange={e => setNotes(e.target.value)} />
+              </div>
+
+              {/* Итог */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
+                <span className="font-semibold text-foreground">Остаток</span>
+                <span className={`text-xl font-display font-bold ${remainder >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtMoney(remainder)}</span>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-3 flex-shrink-0">
+              <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-xl text-sm font-medium border border-border hover:bg-muted transition-colors text-foreground">Отмена</button>
+              <button onClick={save} disabled={saving} className="px-5 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50">
+                {saving ? "Сохранение..." : "Сохранить отчёт"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Просмотр отчёта */}
+      {viewReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border flex-shrink-0">
+              <div>
+                <div className="font-display font-semibold text-foreground">Отчёт — {viewReport.point}</div>
+                <div className="text-sm text-muted-foreground">{fmtDate(viewReport.report_date)}</div>
+              </div>
+              <button onClick={() => setViewReport(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><Icon name="X" size={16} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+              {viewReport.tours?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Туры</div>
+                  {viewReport.tours.map((t: { id: number; title: string; quads_info: string; amount: number }) => (
+                    <div key={t.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div>
+                        <div className="text-sm font-medium">{t.title}</div>
+                        {t.quads_info && <div className="text-xs text-muted-foreground">({t.quads_info})</div>}
+                      </div>
+                      <div className="text-sm font-semibold text-emerald-600">{fmtMoney(Number(t.amount))}</div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between pt-2 text-sm font-semibold">
+                    <span>Итого туры</span>
+                    <span className="text-emerald-600">{fmtMoney(viewReport.tours.reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0))}</span>
+                  </div>
+                </div>
+              )}
+              {viewReport.expenses?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Расходы</div>
+                  {viewReport.expenses.map((e: { id: number; title: string; amount: number }) => (
+                    <div key={e.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div className="text-sm">{e.title}</div>
+                      <div className="text-sm font-semibold text-red-500">{fmtMoney(Number(e.amount))}</div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between pt-2 text-sm font-semibold">
+                    <span>Итого расходы</span>
+                    <span className="text-red-500">{fmtMoney(viewReport.expenses.reduce((s: number, e: { amount: number }) => s + Number(e.amount), 0))}</span>
+                  </div>
+                </div>
+              )}
+              {viewReport.notes && <div className="text-sm text-muted-foreground bg-muted/40 rounded-xl p-3">{viewReport.notes}</div>}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
+                <span className="font-semibold">Остаток</span>
+                <span className={`text-xl font-display font-bold ${Number(viewReport.remainder) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtMoney(Number(viewReport.remainder))}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteId !== null && <ConfirmDelete text="Отчёт будет удалён" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-semibold">Дневные отчёты</h1>
+          <p className="text-muted-foreground text-sm mt-1">{reports.length} отчётов</p>
+        </div>
+        <button onClick={openForm} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
+          <Icon name="Plus" size={16} /> Новый отчёт
+        </button>
+      </div>
+
+      {!reports.length ? (
+        <Empty icon="FileText" text="Отчётов пока нет" action="Создать первый отчёт" onAction={openForm} />
+      ) : (
+        <div className="space-y-3">
+          {reports.map(r => (
+            <div key={r.id} className="bg-card rounded-2xl border border-border p-5 flex items-center gap-4 hover:border-primary/40 transition-colors">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Icon name="FileText" size={22} className="text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-foreground">{fmtDate(r.report_date)}</span>
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium">{r.point}</span>
+                </div>
+                <div className="flex gap-4 mt-1.5 text-sm">
+                  <span className="text-emerald-600 font-medium">Касса: {fmtMoney(Number(r.total_cash))}</span>
+                  <span className={`font-medium ${Number(r.remainder) >= 0 ? "text-foreground" : "text-red-500"}`}>Остаток: {fmtMoney(Number(r.remainder))}</span>
+                </div>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <button
+                  onClick={async () => { const d = await api.daily_reports.get(r.id); setViewReport(d); }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="Просмотр"
+                >
+                  <Icon name="Eye" size={15} />
+                </button>
+                <button
+                  onClick={() => setDeleteId(r.id)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                  title="Удалить"
+                >
+                  <Icon name="Trash2" size={15} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── СОТРУДНИКИ ────────────────────────────────────────────────
 
 const emptyEmp = { name: "", role: "", phone: "", status: "active", notes: "" };
@@ -1057,6 +1338,7 @@ export default function Index() {
     income: <TransactionSection type="income" />,
     expenses: <TransactionSection type="expense" />,
     reports: <Reports />,
+    daily_reports: <DailyReports />,
     employees: <Employees />,
     contacts: <Contacts />,
   };

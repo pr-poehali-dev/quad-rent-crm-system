@@ -332,6 +332,58 @@ def handler(event: dict, context) -> dict:
                 conn.commit()
                 return ok({'deleted': True})
 
+        # ── DAILY REPORTS ──────────────────────────────────────
+        elif resource == 'daily_reports':
+            if method == 'GET':
+                rid = params.get('id')
+                if rid:
+                    cur.execute(f'SELECT * FROM "{S}".daily_reports WHERE id=%s', (rid,))
+                    row = cur.fetchone()
+                    if not row:
+                        return {'statusCode': 404, 'headers': {'Access-Control-Allow-Origin': '*'}, 'body': '{"error":"not found"}'}
+                    report = dict(row)
+                    report['report_date'] = str(report['report_date'])
+                    cur.execute(f'SELECT * FROM "{S}".report_tours WHERE report_id=%s ORDER BY sort_order', (rid,))
+                    report['tours'] = [dict(r) for r in cur.fetchall()]
+                    cur.execute(f'SELECT * FROM "{S}".report_expenses WHERE report_id=%s ORDER BY sort_order', (rid,))
+                    report['expenses'] = [dict(r) for r in cur.fetchall()]
+                    return ok(report)
+                else:
+                    cur.execute(f'SELECT * FROM "{S}".daily_reports ORDER BY report_date DESC')
+                    rows = []
+                    for r in cur.fetchall():
+                        d = dict(r)
+                        d['report_date'] = str(d['report_date'])
+                        rows.append(d)
+                    return ok(rows)
+
+            elif method == 'POST':
+                # Сохраняем отчёт целиком: {report_date, point, total_cash, remainder, notes, tours:[{title,quads_info,amount}], expenses:[{title,amount}]}
+                tours = body.pop('tours', [])
+                expenses = body.pop('expenses', [])
+                cur.execute(f"""
+                    INSERT INTO "{S}".daily_reports (report_date, point, total_cash, remainder, notes)
+                    VALUES (%s,%s,%s,%s,%s) RETURNING id
+                """, (body['report_date'], body['point'], body.get('total_cash', 0),
+                      body.get('remainder', 0), body.get('notes')))
+                new_id = cur.fetchone()['id']
+                for i, t in enumerate(tours):
+                    cur.execute(f"""INSERT INTO "{S}".report_tours (report_id,title,quads_info,amount,sort_order)
+                        VALUES (%s,%s,%s,%s,%s)""", (new_id, t['title'], t.get('quads_info',''), t.get('amount',0), i))
+                for i, e in enumerate(expenses):
+                    cur.execute(f"""INSERT INTO "{S}".report_expenses (report_id,title,amount,sort_order)
+                        VALUES (%s,%s,%s,%s)""", (new_id, e['title'], e.get('amount',0), i))
+                conn.commit()
+                return ok({'id': new_id})
+
+            elif method == 'DELETE':
+                rid = params.get('id')
+                cur.execute(f'DELETE FROM "{S}".report_tours WHERE report_id=%s', (rid,))
+                cur.execute(f'DELETE FROM "{S}".report_expenses WHERE report_id=%s', (rid,))
+                cur.execute(f'DELETE FROM "{S}".daily_reports WHERE id=%s', (rid,))
+                conn.commit()
+                return ok({'deleted': True})
+
         # ── REPORTS ────────────────────────────────────────────
         elif resource == 'reports':
             # Помесячная динамика (до 12 мес.)
