@@ -203,16 +203,16 @@ function Dashboard() {
   ];
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="animate-fade-in space-y-5 sm:space-y-8">
       <div>
-        <h1 className="text-2xl font-display font-semibold text-foreground">Дашборд</h1>
+        <h1 className="text-xl sm:text-2xl font-display font-semibold text-foreground">Дашборд</h1>
         <p className="text-muted-foreground text-sm mt-1 capitalize">{today}</p>
       </div>
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {stats.map(s => (
           <div key={s.label} className="stat-card">
-            <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-4`}><Icon name={s.icon} size={20} className={s.color} /></div>
-            <div className="text-2xl font-display font-semibold text-foreground">{s.value}</div>
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}><Icon name={s.icon} size={18} className={s.color} /></div>
+            <div className="text-xl sm:text-2xl font-display font-semibold text-foreground">{s.value}</div>
             <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
           </div>
         ))}
@@ -308,43 +308,76 @@ function Clients() {
       )}
       {deleteId !== null && <ConfirmDelete text="Клиент будет удалён из базы" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-display font-semibold">Клиенты</h1><p className="text-muted-foreground text-sm mt-1">{items.length} клиентов в базе</p></div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"><Icon name="Plus" size={16} /> Добавить клиента</button>
+      <div className="flex items-center justify-between gap-3">
+        <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Клиенты</h1><p className="text-muted-foreground text-sm mt-1">{items.length} клиентов в базе</p></div>
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить клиента</span><span className="sm:hidden">Добавить</span></button>
       </div>
 
       {!items.length ? <Empty icon="Users" text="Клиентов пока нет" action="Добавить клиента" onAction={() => setShowModal(true)} /> : (
-        <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <table className="w-full">
-            <thead><tr className="border-b border-border">
-              <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Клиент</th>
-              <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Телефон</th>
-              <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Поездок</th>
-              <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Сумма</th>
-              <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Статус</th>
-              <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4"></th>
-            </tr></thead>
-            <tbody>
-              {items.map(c => (
-                <tr key={c.id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${c.is_blacklisted ? "bg-red-50/50" : ""}`}>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-xs font-semibold text-primary">{c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}</div>
-                      <div><span className="text-sm font-medium">{c.full_name}</span>{c.is_blacklisted && <div className="text-[10px] text-red-600 font-medium">Чёрный список</div>}{c.notes && <div className="text-[10px] text-muted-foreground">{c.notes}</div>}</div>
+        <>
+          {/* Карточки на мобиле */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {items.map(c => {
+              const initials = c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+              const status = c.is_blacklisted ? "blacklisted" : Number(c.trips_count) > 5 ? "vip" : Number(c.trips_count) === 0 ? "new" : "active";
+              return (
+                <div key={c.id} className={`bg-card rounded-2xl border border-border p-4 ${c.is_blacklisted ? "border-red-200 bg-red-50/30" : ""}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">{initials}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-semibold text-foreground truncate">{c.full_name}</div>
+                        <StatusBadge status={status} />
+                      </div>
+                      {c.phone && <div className="text-sm text-muted-foreground mt-0.5">{c.phone}</div>}
+                      {c.telegram && <div className="text-xs text-muted-foreground">{c.telegram}</div>}
+                      {c.notes && <div className="text-xs text-muted-foreground mt-1 italic">{c.notes}</div>}
+                      {c.is_blacklisted && <div className="text-xs text-red-600 font-medium mt-1">⛔ Чёрный список</div>}
+                      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border">
+                        <span className="text-xs text-muted-foreground">{c.trips_count} поездок</span>
+                        <span className="text-xs font-semibold text-foreground">₽ {Number(c.total_spent).toLocaleString()}</span>
+                        {c.passport && <span className="text-xs text-muted-foreground truncate">📄 {c.passport}</span>}
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{c.phone || "—"}</td>
-                  <td className="px-6 py-4 text-sm">{c.trips_count}</td>
-                  <td className="px-6 py-4 text-sm font-medium">₽ {Number(c.total_spent).toLocaleString()}</td>
-                  <td className="px-6 py-4"><StatusBadge status={c.is_blacklisted ? "blacklisted" : Number(c.trips_count) > 5 ? "vip" : Number(c.trips_count) === 0 ? "new" : "active"} /></td>
-                  <td className="px-6 py-4">
-                    <button onClick={() => setDeleteId(c.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <button onClick={() => setDeleteId(c.id)} className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Таблица на десктопе */}
+          <div className="hidden sm:block bg-card rounded-2xl border border-border overflow-hidden">
+            <table className="w-full">
+              <thead><tr className="border-b border-border">
+                <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Клиент</th>
+                <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Телефон</th>
+                <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Поездок</th>
+                <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Сумма</th>
+                <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4">Статус</th>
+                <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4"></th>
+              </tr></thead>
+              <tbody>
+                {items.map(c => (
+                  <tr key={c.id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${c.is_blacklisted ? "bg-red-50/50" : ""}`}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-xs font-semibold text-primary">{c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}</div>
+                        <div><span className="text-sm font-medium">{c.full_name}</span>{c.is_blacklisted && <div className="text-[10px] text-red-600 font-medium">Чёрный список</div>}{c.notes && <div className="text-[10px] text-muted-foreground">{c.notes}</div>}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{c.phone || "—"}</td>
+                    <td className="px-6 py-4 text-sm">{c.trips_count}</td>
+                    <td className="px-6 py-4 text-sm font-medium">₽ {Number(c.total_spent).toLocaleString()}</td>
+                    <td className="px-6 py-4"><StatusBadge status={c.is_blacklisted ? "blacklisted" : Number(c.trips_count) > 5 ? "vip" : Number(c.trips_count) === 0 ? "new" : "active"} /></td>
+                    <td className="px-6 py-4">
+                      <button onClick={() => setDeleteId(c.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -406,9 +439,9 @@ function Quads() {
       )}
       {deleteId !== null && <ConfirmDelete text="Квадроцикл будет удалён из парка" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-display font-semibold">Квадроциклы</h1><p className="text-muted-foreground text-sm mt-1">{items.length} единиц техники</p></div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"><Icon name="Plus" size={16} /> Добавить технику</button>
+      <div className="flex items-center justify-between gap-3">
+        <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Квадроциклы</h1><p className="text-muted-foreground text-sm mt-1">{items.length} единиц техники</p></div>
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить технику</span><span className="sm:hidden">Добавить</span></button>
       </div>
 
       {!items.length ? <Empty icon="Bike" text="Техника не добавлена" action="Добавить квадроцикл" onAction={() => setShowModal(true)} /> : (
@@ -534,53 +567,86 @@ function Bookings() {
       )}
       {deleteId !== null && <ConfirmDelete text="Бронирование и связанные транзакции будут удалены" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-display font-semibold">Бронирования</h1><p className="text-muted-foreground text-sm mt-1">{active} активных · {items.length} всего</p></div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"><Icon name="Plus" size={16} /> Новое бронирование</button>
+      <div className="flex items-center justify-between gap-3">
+        <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Бронирования</h1><p className="text-muted-foreground text-sm mt-1">{active} активных · {items.length} всего</p></div>
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Новое бронирование</span><span className="sm:hidden">Создать</span></button>
       </div>
 
       {!items.length ? <Empty icon="ClipboardList" text="Бронирований нет" action="Создать бронирование" onAction={() => setShowModal(true)} /> : (
-        <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead><tr className="border-b border-border">
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">№</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Клиент</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Квадроцикл</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Начало</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Ч.</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Сумма</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Статус</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Действие</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4"></th>
-              </tr></thead>
-              <tbody>
-                {items.map(b => (
-                  <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-4 text-sm text-muted-foreground font-mono">#{b.id}</td>
-                    <td className="px-5 py-4 text-sm font-medium">{b.client_name || "—"}</td>
-                    <td className="px-5 py-4 text-sm text-muted-foreground">{b.quad_name}</td>
-                    <td className="px-5 py-4 text-sm">{new Date(b.start_time).toLocaleDateString("ru-RU")}</td>
-                    <td className="px-5 py-4 text-sm">{b.duration_hours}</td>
-                    <td className="px-5 py-4 text-sm font-semibold">₽ {Number(b.amount).toLocaleString()}</td>
-                    <td className="px-5 py-4"><StatusBadge status={b.status} /></td>
-                    <td className="px-5 py-4">
-                      <div className="flex gap-1">
-                        {b.status === "pending" && <button onClick={() => changeStatus(b.id, "confirmed")} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 font-medium whitespace-nowrap">Подтвердить</button>}
-                        {b.status === "confirmed" && <button onClick={() => changeStatus(b.id, "issued")} className="text-[10px] bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 font-medium">Выдать</button>}
-                        {b.status === "issued" && <button onClick={() => changeStatus(b.id, "returned")} className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg hover:bg-emerald-200 font-medium">Принять</button>}
-                        {["pending", "confirmed"].includes(b.status) && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 font-medium">Отмена</button>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <button onClick={() => setDeleteId(b.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Карточки на мобиле */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {items.map(b => (
+              <div key={b.id} className="bg-card rounded-2xl border border-border p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-foreground">{b.client_name || "—"}</div>
+                    <div className="text-sm text-muted-foreground">{b.quad_name}</div>
+                    {b.point && <div className="text-xs text-muted-foreground mt-0.5">📍 {b.point}</div>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <StatusBadge status={b.status} />
+                    <button onClick={() => setDeleteId(b.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={13} /></button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <div>{new Date(b.start_time).toLocaleDateString("ru-RU")} · {b.duration_hours} ч</div>
+                  </div>
+                  <div className="text-sm font-bold text-foreground">₽ {Number(b.amount).toLocaleString()}</div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {b.status === "pending" && <button onClick={() => changeStatus(b.id, "confirmed")} className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-xl hover:bg-blue-200 font-medium">Подтвердить</button>}
+                  {b.status === "confirmed" && <button onClick={() => changeStatus(b.id, "issued")} className="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-xl hover:bg-orange-200 font-medium">Выдать</button>}
+                  {b.status === "issued" && <button onClick={() => changeStatus(b.id, "returned")} className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl hover:bg-emerald-200 font-medium">Принять</button>}
+                  {["pending", "confirmed"].includes(b.status) && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-xl hover:bg-red-200 font-medium">Отмена</button>}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+          {/* Таблица на десктопе */}
+          <div className="hidden sm:block bg-card rounded-2xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className="border-b border-border">
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">№</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Клиент</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Квадроцикл</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Начало</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Ч.</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Сумма</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Статус</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Действие</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4"></th>
+                </tr></thead>
+                <tbody>
+                  {items.map(b => (
+                    <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-4 text-sm text-muted-foreground font-mono">#{b.id}</td>
+                      <td className="px-5 py-4 text-sm font-medium">{b.client_name || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{b.quad_name}</td>
+                      <td className="px-5 py-4 text-sm">{new Date(b.start_time).toLocaleDateString("ru-RU")}</td>
+                      <td className="px-5 py-4 text-sm">{b.duration_hours}</td>
+                      <td className="px-5 py-4 text-sm font-semibold">₽ {Number(b.amount).toLocaleString()}</td>
+                      <td className="px-5 py-4"><StatusBadge status={b.status} /></td>
+                      <td className="px-5 py-4">
+                        <div className="flex gap-1">
+                          {b.status === "pending" && <button onClick={() => changeStatus(b.id, "confirmed")} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 font-medium whitespace-nowrap">Подтвердить</button>}
+                          {b.status === "confirmed" && <button onClick={() => changeStatus(b.id, "issued")} className="text-[10px] bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 font-medium">Выдать</button>}
+                          {b.status === "issued" && <button onClick={() => changeStatus(b.id, "returned")} className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg hover:bg-emerald-200 font-medium">Принять</button>}
+                          {["pending", "confirmed"].includes(b.status) && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 font-medium">Отмена</button>}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button onClick={() => setDeleteId(b.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -645,60 +711,88 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
       )}
       {deleteId !== null && <ConfirmDelete text="Запись будет удалена" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-semibold">{title}</h1>
+          <h1 className="text-xl sm:text-2xl font-display font-semibold">{title}</h1>
           <p className="text-muted-foreground text-sm mt-1">{data.items?.length || 0} записей{total !== undefined ? ` · ₽ ${Number(total).toLocaleString()}` : ""}</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"><Icon name="Plus" size={16} /> {addLabel}</button>
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">{addLabel}</span><span className="sm:hidden">Добавить</span></button>
       </div>
 
       {isAll && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Итого доходов</div><div className="text-2xl font-display font-semibold text-emerald-600">₽ {Number(data.totals?.total_income || 0).toLocaleString()}</div></div>
-          <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Итого расходов</div><div className="text-2xl font-display font-semibold text-red-500">₽ {Number(data.totals?.total_expense || 0).toLocaleString()}</div></div>
-          <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Прибыль</div><div className={`text-2xl font-display font-semibold ${Number(data.totals?.profit) >= 0 ? "text-foreground" : "text-red-500"}`}>₽ {Number(data.totals?.profit || 0).toLocaleString()}</div></div>
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
+          <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Доходы</div><div className="text-lg sm:text-2xl font-display font-semibold text-emerald-600">₽ {Number(data.totals?.total_income || 0).toLocaleString()}</div></div>
+          <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Расходы</div><div className="text-lg sm:text-2xl font-display font-semibold text-red-500">₽ {Number(data.totals?.total_expense || 0).toLocaleString()}</div></div>
+          <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Прибыль</div><div className={`text-lg sm:text-2xl font-display font-semibold ${Number(data.totals?.profit) >= 0 ? "text-foreground" : "text-red-500"}`}>₽ {Number(data.totals?.profit || 0).toLocaleString()}</div></div>
         </div>
       )}
 
       {!(data.items?.length) ? <Empty icon={type === "income" ? "TrendingUp" : "TrendingDown"} text="Записей нет" action={addLabel} onAction={() => setShowModal(true)} /> : (
-        <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead><tr className="border-b border-border">
-                {isAll && <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Тип</th>}
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Категория</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Описание</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Дата</th>
-                <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Сумма</th>
-                <th className="px-5 py-4"></th>
-              </tr></thead>
-              <tbody>
-                {(data.items || []).map((t: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
-                  <tr key={t.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    {isAll && <td className="px-5 py-4"><StatusBadge status={t.type} /></td>}
-                    <td className="px-5 py-4 text-sm font-medium">{t.category}</td>
-                    <td className="px-5 py-4 text-sm text-muted-foreground">{t.description || "—"}</td>
-                    <td className="px-5 py-4 text-sm">{t.transaction_date}</td>
-                    <td className={`px-5 py-4 text-sm font-semibold ${t.type === "income" ? "text-emerald-600" : "text-red-500"}`}>
-                      {t.type === "income" ? "+" : "−"}₽ {Number(t.amount).toLocaleString()}
-                    </td>
-                    <td className="px-5 py-4">
-                      <button onClick={() => setDeleteId(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {!isAll && (
-                <tfoot><tr className="border-t border-border bg-muted/30">
-                  <td colSpan={3} className="px-5 py-4 text-sm font-semibold">Итого</td>
-                  <td className={`px-5 py-4 text-sm font-bold ${type === "income" ? "text-emerald-600" : "text-red-500"}`}>₽ {Number(total || 0).toLocaleString()}</td>
-                  <td />
-                </tr></tfoot>
-              )}
-            </table>
+        <>
+          {/* Карточки на мобиле */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {(data.items || []).map((t: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+              <div key={t.id} className="bg-card rounded-2xl border border-border px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium">{t.category}</span>
+                    {isAll && <StatusBadge status={t.type} />}
+                  </div>
+                  {t.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{t.description}</div>}
+                  <div className="text-xs text-muted-foreground mt-0.5">{t.transaction_date}</div>
+                </div>
+                <div className={`text-sm font-bold flex-shrink-0 ${t.type === "income" ? "text-emerald-600" : "text-red-500"}`}>
+                  {t.type === "income" ? "+" : "−"}₽ {Number(t.amount).toLocaleString()}
+                </div>
+                <button onClick={() => setDeleteId(t.id)} className="w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={13} /></button>
+              </div>
+            ))}
+            {!isAll && (
+              <div className="bg-muted/50 rounded-2xl border border-border px-4 py-3 flex items-center justify-between">
+                <span className="text-sm font-semibold">Итого</span>
+                <span className={`text-sm font-bold ${type === "income" ? "text-emerald-600" : "text-red-500"}`}>₽ {Number(total || 0).toLocaleString()}</span>
+              </div>
+            )}
           </div>
-        </div>
+          {/* Таблица на десктопе */}
+          <div className="hidden sm:block bg-card rounded-2xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className="border-b border-border">
+                  {isAll && <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Тип</th>}
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Категория</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Описание</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Дата</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Сумма</th>
+                  <th className="px-5 py-4"></th>
+                </tr></thead>
+                <tbody>
+                  {(data.items || []).map((t: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                    <tr key={t.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      {isAll && <td className="px-5 py-4"><StatusBadge status={t.type} /></td>}
+                      <td className="px-5 py-4 text-sm font-medium">{t.category}</td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{t.description || "—"}</td>
+                      <td className="px-5 py-4 text-sm">{t.transaction_date}</td>
+                      <td className={`px-5 py-4 text-sm font-semibold ${t.type === "income" ? "text-emerald-600" : "text-red-500"}`}>
+                        {t.type === "income" ? "+" : "−"}₽ {Number(t.amount).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-4">
+                        <button onClick={() => setDeleteId(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {!isAll && (
+                  <tfoot><tr className="border-t border-border bg-muted/30">
+                    <td colSpan={3} className="px-5 py-4 text-sm font-semibold">Итого</td>
+                    <td className={`px-5 py-4 text-sm font-bold ${type === "income" ? "text-emerald-600" : "text-red-500"}`}>₽ {Number(total || 0).toLocaleString()}</td>
+                    <td />
+                  </tr></tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -747,7 +841,7 @@ function Reports() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div><h1 className="text-2xl font-display font-semibold">Отчёты</h1><p className="text-muted-foreground text-sm mt-1">Аналитика по реальным данным</p></div>
+      <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Отчёты</h1><p className="text-muted-foreground text-sm mt-1">Аналитика по реальным данным</p></div>
 
       {/* KPI транзакций */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -1175,13 +1269,13 @@ function DailyReports() {
 
       {deleteId !== null && <ConfirmDelete text="Отчёт будет удалён" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-semibold">Дневные отчёты</h1>
+          <h1 className="text-xl sm:text-2xl font-display font-semibold">Дневные отчёты</h1>
           <p className="text-muted-foreground text-sm mt-1">{reports.length} отчётов</p>
         </div>
-        <button onClick={openForm} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
-          <Icon name="Plus" size={16} /> Новый отчёт
+        <button onClick={openForm} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+          <Icon name="Plus" size={16} /><span className="hidden sm:inline">Новый отчёт</span><span className="sm:hidden">Создать</span>
         </button>
       </div>
 
@@ -1315,13 +1409,13 @@ function Employees() {
         <ConfirmDelete text="Сотрудник будет удалён из системы" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-semibold">Сотрудники</h1>
+          <h1 className="text-xl sm:text-2xl font-display font-semibold">Сотрудники</h1>
           <p className="text-muted-foreground text-sm mt-1">{items.length} человек в команде</p>
         </div>
-        <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
-          <Icon name="Plus" size={16} /> Добавить сотрудника
+        <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+          <Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить сотрудника</span><span className="sm:hidden">Добавить</span>
         </button>
       </div>
 
@@ -1478,8 +1572,35 @@ export default function Index() {
             <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center text-sm font-bold text-primary cursor-pointer">БТ</div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{sections[active]}</main>
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 pb-20 sm:pb-6">{sections[active]}</main>
       </div>
+
+      {/* Нижняя навигация — только мобиле */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border flex items-center justify-around px-1 py-1 safe-area-pb">
+        {[
+          { id: "dashboard" as Section, label: "Дашборд", icon: "LayoutDashboard" },
+          { id: "bookings" as Section, label: "Брони", icon: "ClipboardList" },
+          { id: "daily_reports" as Section, label: "Отчёт", icon: "FileText" },
+          { id: "clients" as Section, label: "Клиенты", icon: "Users" },
+          { id: "quads" as Section, label: "Техника", icon: "Bike" },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActive(item.id)}
+            className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl flex-1 transition-colors ${active === item.id ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+          >
+            <Icon name={item.icon} size={20} />
+            <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+          </button>
+        ))}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl flex-1 transition-colors text-muted-foreground`}
+        >
+          <Icon name="Menu" size={20} />
+          <span className="text-[10px] font-medium leading-tight">Ещё</span>
+        </button>
+      </nav>
     </div>
   );
 }
