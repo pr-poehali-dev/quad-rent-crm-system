@@ -112,7 +112,9 @@ def handler(event: dict, context) -> dict:
 
             elif method == 'DELETE':
                 qid = params.get('id')
-                cur.execute(f'DELETE FROM "{S}".quads WHERE id = %s', (qid,))
+                cur.execute(f'DELETE FROM "{S}".transactions WHERE booking_id IN (SELECT id FROM "{S}".bookings WHERE quad_id=%s)', (qid,))
+                cur.execute(f'DELETE FROM "{S}".bookings WHERE quad_id=%s', (qid,))
+                cur.execute(f'DELETE FROM "{S}".quads WHERE id=%s', (qid,))
                 conn.commit()
                 return ok({'deleted': True})
 
