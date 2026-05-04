@@ -299,6 +299,39 @@ def handler(event: dict, context) -> dict:
                 conn.commit()
                 return ok({'deleted': True})
 
+        # ── EMPLOYEES ──────────────────────────────────────────
+        elif resource == 'employees':
+            if method == 'GET':
+                cur.execute(f'SELECT * FROM "{S}".employees ORDER BY created_at')
+                return ok([dict(r) for r in cur.fetchall()])
+
+            elif method == 'POST':
+                cur.execute(f"""
+                    INSERT INTO "{S}".employees (name, role, phone, status, notes)
+                    VALUES (%s,%s,%s,%s,%s) RETURNING *
+                """, (body['name'], body.get('role'), body.get('phone'),
+                      body.get('status', 'active'), body.get('notes')))
+                conn.commit()
+                return ok(dict(cur.fetchone()))
+
+            elif method == 'PUT':
+                eid = params.get('id')
+                fields, vals = [], []
+                for f in ['name', 'role', 'phone', 'status', 'notes']:
+                    if f in body:
+                        fields.append(f'{f} = %s')
+                        vals.append(body[f])
+                vals.append(eid)
+                cur.execute(f'UPDATE "{S}".employees SET {", ".join(fields)} WHERE id=%s RETURNING *', vals)
+                conn.commit()
+                return ok(dict(cur.fetchone()))
+
+            elif method == 'DELETE':
+                eid = params.get('id')
+                cur.execute(f'DELETE FROM "{S}".employees WHERE id=%s', (eid,))
+                conn.commit()
+                return ok({'deleted': True})
+
         # ── REPORTS ────────────────────────────────────────────
         elif resource == 'reports':
             # Помесячная динамика (до 12 мес.)

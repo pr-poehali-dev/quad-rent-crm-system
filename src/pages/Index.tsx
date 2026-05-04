@@ -852,48 +852,141 @@ function CalendarView() {
 
 // ── СОТРУДНИКИ ────────────────────────────────────────────────
 
-const employeesList = [
-  { id: 1, name: "Иван Смирнов", role: "Механик", phone: "+7 900 111-22-33", status: "active" },
-  { id: 2, name: "Кирилл Быков", role: "Инструктор", phone: "+7 900 222-33-44", status: "active" },
-  { id: 3, name: "Ольга Нечаева", role: "Администратор", phone: "+7 900 333-44-55", status: "active" },
-  { id: 4, name: "Роман Тимофеев", role: "Инструктор", phone: "+7 900 444-55-66", status: "day-off" },
-];
+const emptyEmp = { name: "", role: "", phone: "", status: "active", notes: "" };
 
 function Employees() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", role: "", phone: "", status: "active" });
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [form, setForm] = useState(emptyEmp);
+
+  const load = useCallback(() => {
+    api.employees.list().then(d => { setItems(d); setLoading(false); });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const openAdd = () => { setEditItem(null); setForm(emptyEmp); setShowModal(true); };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const openEdit = (e: any) => { setEditItem(e); setForm({ name: e.name, role: e.role || "", phone: e.phone || "", status: e.status, notes: e.notes || "" }); setShowModal(true); };
+
+  const save = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    if (editItem) {
+      await api.employees.update(editItem.id, form);
+    } else {
+      await api.employees.create(form);
+    }
+    setSaving(false); setShowModal(false);
+    load();
+  };
+
+  const remove = async (id: number) => { await api.employees.remove(id); setDeleteId(null); load(); };
+
+  if (loading) return <Spinner />;
+
+  const roleColors: Record<string, string> = {
+    "Инструктор": "bg-blue-50 text-blue-700",
+    "Механик": "bg-yellow-50 text-yellow-700",
+    "Администратор": "bg-violet-50 text-violet-700",
+    "Охранник": "bg-gray-100 text-gray-600",
+  };
+
   return (
     <div className="animate-fade-in space-y-6">
       {showModal && (
-        <Modal title="Добавить сотрудника" onClose={() => setShowModal(false)} onSubmit={() => setShowModal(false)}>
-          <Field label="Имя и фамилия *"><input className={inputCls} placeholder="Иван Смирнов" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
+        <Modal
+          title={editItem ? "Редактировать сотрудника" : "Добавить сотрудника"}
+          onClose={() => setShowModal(false)}
+          onSubmit={save}
+          loading={saving}
+        >
+          <Field label="Имя и фамилия *">
+            <input className={inputCls} placeholder="Иван Смирнов" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          </Field>
           <Field label="Должность">
             <select className={selectCls} value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
               <option value="">— Выберите —</option>
-              <option>Инструктор</option><option>Механик</option><option>Администратор</option><option>Охранник</option>
+              <option>Инструктор</option>
+              <option>Механик</option>
+              <option>Администратор</option>
+              <option>Охранник</option>
             </select>
           </Field>
-          <Field label="Телефон"><input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
+          <Field label="Телефон">
+            <input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+          </Field>
           <Field label="Статус">
             <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              <option value="active">Активен</option><option value="day-off">Выходной</option>
+              <option value="active">Активен</option>
+              <option value="day-off">Выходной</option>
+              <option value="fired">Уволен</option>
             </select>
+          </Field>
+          <Field label="Заметки">
+            <textarea className={inputCls} rows={2} placeholder="Доп. информация..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
           </Field>
         </Modal>
       )}
+      {deleteId !== null && (
+        <ConfirmDelete text="Сотрудник будет удалён из системы" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />
+      )}
+
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-display font-semibold">Сотрудники</h1><p className="text-muted-foreground text-sm mt-1">{employeesList.length} человека в команде</p></div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"><Icon name="Plus" size={16} /> Добавить</button>
+        <div>
+          <h1 className="text-2xl font-display font-semibold">Сотрудники</h1>
+          <p className="text-muted-foreground text-sm mt-1">{items.length} человек в команде</p>
+        </div>
+        <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
+          <Icon name="Plus" size={16} /> Добавить сотрудника
+        </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {employeesList.map(e => (
-          <div key={e.id} className="bg-card rounded-2xl border border-border p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">{e.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</div>
-            <div className="flex-1"><div className="font-semibold">{e.name}</div><div className="text-sm text-muted-foreground">{e.role}</div><div className="text-xs text-muted-foreground mt-1">{e.phone}</div></div>
-            <StatusBadge status={e.status} />
-          </div>
-        ))}
-      </div>
+
+      {!items.length ? (
+        <Empty icon="UserCog" text="Сотрудников пока нет" action="Добавить сотрудника" onAction={openAdd} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {items.map(e => (
+            <div key={e.id} className="bg-card rounded-2xl border border-border p-5 flex items-center gap-4">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
+                {e.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-foreground truncate">{e.name}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  {e.role && <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${roleColors[e.role] || "bg-muted text-muted-foreground"}`}>{e.role}</span>}
+                </div>
+                {e.phone && <div className="text-xs text-muted-foreground mt-1">{e.phone}</div>}
+                {e.notes && <div className="text-xs text-muted-foreground mt-0.5 truncate">{e.notes}</div>}
+              </div>
+              <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                <StatusBadge status={e.status} />
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => openEdit(e)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    title="Редактировать"
+                  >
+                    <Icon name="Pencil" size={13} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteId(e.id)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Удалить"
+                  >
+                    <Icon name="Trash2" size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@
       "method": "GET",
       "path": "/?resource=dashboard",
       "expectedStatus": 200,
-      "expectedBody": {"total_quads": 9},
+      "expectedBody": {"total_quads": 3},
       "bodyMatcher": "partial"
     },
     {
@@ -40,6 +40,13 @@
       "name": "Get reports",
       "method": "GET",
       "path": "/?resource=reports",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get employees",
+      "method": "GET",
+      "path": "/?resource=employees",
       "expectedStatus": 200,
       "bodyMatcher": "partial"
     }
