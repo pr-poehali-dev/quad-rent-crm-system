@@ -156,6 +156,13 @@ def handler(event: dict, context) -> dict:
                 conn.commit()
                 return ok(dict(cur.fetchone()))
 
+            elif method == 'DELETE':
+                cid = params.get('id')
+                cur.execute(f'UPDATE "{S}".bookings SET client_id=NULL WHERE client_id=%s', (cid,))
+                cur.execute(f'DELETE FROM "{S}".clients WHERE id=%s', (cid,))
+                conn.commit()
+                return ok({'deleted': True})
+
         # ── BOOKINGS ───────────────────────────────────────────
         elif resource == 'bookings':
             if method == 'GET':
@@ -233,6 +240,17 @@ def handler(event: dict, context) -> dict:
                 conn.commit()
                 return ok(booking)
 
+            elif method == 'DELETE':
+                bid = params.get('id')
+                cur.execute(f'SELECT quad_id, status FROM "{S}".bookings WHERE id=%s', (bid,))
+                row = cur.fetchone()
+                if row and row['status'] in ('issued', 'confirmed'):
+                    cur.execute(f"UPDATE \"{S}\".quads SET status='available' WHERE id=%s", (row['quad_id'],))
+                cur.execute(f'DELETE FROM "{S}".transactions WHERE booking_id=%s', (bid,))
+                cur.execute(f'DELETE FROM "{S}".bookings WHERE id=%s', (bid,))
+                conn.commit()
+                return ok({'deleted': True})
+
         # ── TRANSACTIONS ───────────────────────────────────────
         elif resource == 'transactions':
             if method == 'GET':
@@ -281,34 +299,96 @@ def handler(event: dict, context) -> dict:
 
         # ── REPORTS ────────────────────────────────────────────
         elif resource == 'reports':
+            # Помесячная динамика (до 12 мес.)
             cur.execute(f"""
                 SELECT
+                  TO_CHAR(DATE_TRUNC('month', transaction_date), 'YYYY-MM') AS month_key,
                   DATE_TRUNC('month', transaction_date) AS month,
                   COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) AS income,
-                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS expense
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS expense,
+                  COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) -
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS profit
                 FROM "{S}".transactions
-                GROUP BY 1 ORDER BY 1 DESC LIMIT 12
+                GROUP BY 1,2 ORDER BY 2 ASC LIMIT 12
             """)
             monthly = [dict(r) for r in cur.fetchall()]
 
+            # Расходы по категориям (все время)
             cur.execute(f"""
-                SELECT category, SUM(amount) AS total
+                SELECT category, SUM(amount) AS total, COUNT(*) as count
                 FROM "{S}".transactions WHERE type='expense'
                 GROUP BY category ORDER BY total DESC
             """)
             expense_by_cat = [dict(r) for r in cur.fetchall()]
 
+            # Доходы по категориям (все время)
             cur.execute(f"""
-                SELECT q.name, COUNT(b.id) as trips, COALESCE(SUM(b.amount),0) as revenue
+                SELECT category, SUM(amount) AS total, COUNT(*) as count
+                FROM "{S}".transactions WHERE type='income'
+                GROUP BY category ORDER BY total DESC
+            """)
+            income_by_cat = [dict(r) for r in cur.fetchall()]
+
+            # Итоги за все время
+            cur.execute(f"""
+                SELECT
+                  COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) AS total_income,
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS total_expense,
+                  COUNT(CASE WHEN type='income' THEN 1 END) AS income_count,
+                  COUNT(CASE WHEN type='expense' THEN 1 END) AS expense_count
+                FROM "{S}".transactions
+            """)
+            totals = dict(cur.fetchone())
+            totals['total_profit'] = totals['total_income'] - totals['total_expense']
+
+            # Итоги текущего месяца
+            cur.execute(f"""
+                SELECT
+                  COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) AS month_income,
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS month_expense
+                FROM "{S}".transactions
+                WHERE DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
+            """)
+            month_totals = dict(cur.fetchone())
+            month_totals['month_profit'] = month_totals['month_income'] - month_totals['month_expense']
+
+            # Статистика по технике
+            cur.execute(f"""
+                SELECT q.name, q.hourly_rate,
+                  COUNT(b.id) as trips,
+                  COALESCE(SUM(b.amount),0) as revenue,
+                  COALESCE(SUM(b.duration_hours),0) as total_hours
                 FROM "{S}".quads q LEFT JOIN "{S}".bookings b ON b.quad_id = q.id AND b.status = 'returned'
-                GROUP BY q.id, q.name ORDER BY revenue DESC
+                GROUP BY q.id, q.name, q.hourly_rate ORDER BY revenue DESC
             """)
             quad_stats = [dict(r) for r in cur.fetchall()]
+
+            # Статистика бронирований
+            cur.execute(f"""
+                SELECT status, COUNT(*) as count, COALESCE(SUM(amount),0) as total
+                FROM "{S}".bookings GROUP BY status
+            """)
+            booking_stats = [dict(r) for r in cur.fetchall()]
+
+            # Среднедневная выручка (текущий месяц)
+            cur.execute(f"""
+                SELECT transaction_date, SUM(CASE WHEN type='income' THEN amount ELSE 0 END) as income,
+                       SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as expense
+                FROM "{S}".transactions
+                WHERE DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
+                GROUP BY transaction_date ORDER BY transaction_date
+            """)
+            daily_current = [dict(r) for r in cur.fetchall()]
 
             return ok({
                 'monthly': monthly,
                 'expense_by_category': expense_by_cat,
+                'income_by_category': income_by_cat,
+                'totals': totals,
+                'month_totals': month_totals,
                 'quad_stats': quad_stats,
+                'booking_stats': booking_stats,
+                'daily_current': daily_current,
             })
 
         return err('Unknown resource')

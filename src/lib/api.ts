@@ -28,12 +28,14 @@ export const api = {
     list: (search?: string) => request('clients', 'GET', undefined, search ? { search } : undefined),
     create: (data: object) => request('clients', 'POST', data),
     update: (id: number, data: object) => request('clients', 'PUT', data, { id: String(id) }),
+    remove: (id: number) => request('clients', 'DELETE', undefined, { id: String(id) }),
   },
 
   bookings: {
     list: (params?: Record<string, string>) => request('bookings', 'GET', undefined, params),
     create: (data: object) => request('bookings', 'POST', data),
     update: (id: number, data: object) => request('bookings', 'PUT', data, { id: String(id) }),
+    remove: (id: number) => request('bookings', 'DELETE', undefined, { id: String(id) }),
   },
 
   transactions: {
