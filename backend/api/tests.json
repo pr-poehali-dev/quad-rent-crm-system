@@ -1,0 +1,47 @@
+{
+  "tests": [
+    {
+      "name": "Dashboard stats",
+      "method": "GET",
+      "path": "/?resource=dashboard",
+      "expectedStatus": 200,
+      "expectedBody": {"total_quads": 9},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get quads list",
+      "method": "GET",
+      "path": "/?resource=quads",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get clients list",
+      "method": "GET",
+      "path": "/?resource=clients",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get bookings",
+      "method": "GET",
+      "path": "/?resource=bookings",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get transactions",
+      "method": "GET",
+      "path": "/?resource=transactions",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get reports",
+      "method": "GET",
+      "path": "/?resource=reports",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
