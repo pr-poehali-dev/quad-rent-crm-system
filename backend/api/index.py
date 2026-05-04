@@ -467,6 +467,49 @@ def handler(event: dict, context) -> dict:
             """)
             daily_current = [dict(r) for r in cur.fetchall()]
 
+            # Статистика по точкам из дневных отчётов (общая)
+            cur.execute(f"""
+                SELECT
+                  point,
+                  COUNT(*) as reports_count,
+                  COALESCE(SUM(total_cash),0) as total_cash,
+                  COALESCE(SUM(remainder),0) as total_remainder,
+                  COALESCE(AVG(total_cash),0) as avg_cash,
+                  MIN(report_date) as first_date,
+                  MAX(report_date) as last_date
+                FROM "{S}".daily_reports
+                GROUP BY point ORDER BY total_cash DESC
+            """)
+            point_stats = [dict(r) for r in cur.fetchall()]
+            for p in point_stats:
+                p['first_date'] = str(p['first_date']) if p['first_date'] else None
+                p['last_date'] = str(p['last_date']) if p['last_date'] else None
+
+            # Общая сводка по всем точкам
+            cur.execute(f"""
+                SELECT
+                  COALESCE(SUM(total_cash),0) as grand_total_cash,
+                  COALESCE(SUM(remainder),0) as grand_total_remainder,
+                  COUNT(*) as grand_reports_count,
+                  COALESCE(AVG(total_cash),0) as grand_avg_cash
+                FROM "{S}".daily_reports
+            """)
+            point_totals = dict(cur.fetchone())
+
+            # Динамика по точкам по месяцам
+            cur.execute(f"""
+                SELECT
+                  point,
+                  TO_CHAR(DATE_TRUNC('month', report_date), 'YYYY-MM') as month_key,
+                  COALESCE(SUM(total_cash),0) as total_cash,
+                  COALESCE(SUM(remainder),0) as total_remainder,
+                  COUNT(*) as reports_count
+                FROM "{S}".daily_reports
+                GROUP BY point, DATE_TRUNC('month', report_date), TO_CHAR(DATE_TRUNC('month', report_date), 'YYYY-MM')
+                ORDER BY DATE_TRUNC('month', report_date) ASC
+            """)
+            point_monthly = [dict(r) for r in cur.fetchall()]
+
             return ok({
                 'monthly': monthly,
                 'expense_by_category': expense_by_cat,
@@ -476,6 +519,9 @@ def handler(event: dict, context) -> dict:
                 'quad_stats': quad_stats,
                 'booking_stats': booking_stats,
                 'daily_current': daily_current,
+                'point_stats': point_stats,
+                'point_totals': point_totals,
+                'point_monthly': point_monthly,
             })
 
         return err('Unknown resource')

@@ -460,7 +460,7 @@ function Bookings() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [form, setForm] = useState({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "" });
+  const [form, setForm] = useState({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
 
   const load = useCallback(() => {
     Promise.all([api.bookings.list(), api.quads.list(), api.clients.list()]).then(([b, q, c]) => { setItems(b); setQuadsList(q); setClientsList(c); setLoading(false); });
@@ -477,7 +477,7 @@ function Bookings() {
     const end = new Date(start.getTime() + hrs * 3600000);
     await api.bookings.create({ ...form, quad_id: Number(form.quad_id), client_id: Number(form.client_id), start_time: start.toISOString(), end_time: end.toISOString(), duration_hours: hrs, amount: Number(form.amount), deposit: Number(form.deposit) });
     setSaving(false); setShowModal(false);
-    setForm({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "" });
+    setForm({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
     load();
   };
   const remove = async (id: number) => { await api.bookings.remove(id); setDeleteId(null); load(); };
@@ -514,11 +514,21 @@ function Bookings() {
               </select>
             </Field>
           </div>
-          <Field label="Статус">
-            <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              <option value="pending">Ожидание</option><option value="confirmed">Подтверждено</option><option value="issued">Выдан</option>
-            </select>
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Точка">
+              <select className={selectCls} value={form.point} onChange={e => setForm({ ...form, point: e.target.value })}>
+                <option value="">— Не указана —</option>
+                <option value="Находка">Находка</option>
+                <option value="Волчанец">Волчанец</option>
+                <option value="Другая">Другая</option>
+              </select>
+            </Field>
+            <Field label="Статус">
+              <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                <option value="pending">Ожидание</option><option value="confirmed">Подтверждено</option><option value="issued">Выдан</option>
+              </select>
+            </Field>
+          </div>
           <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
         </Modal>
       )}
@@ -715,6 +725,8 @@ function Reports() {
   const totals = data.totals || {};
   const monthT = data.month_totals || {};
   const quadStats = (data.quad_stats || []) as { name: string; trips: number; revenue: number; total_hours: number }[];
+  const pointStats = (data.point_stats || []) as { point: string; reports_count: number; total_cash: number; total_remainder: number; avg_cash: number }[];
+  const pointTotals = data.point_totals || {};
 
   const expColors = ["#f87171", "#fb923c", "#fbbf24", "#a78bfa", "#60a5fa", "#34d399", "#f472b6", "#94a3b8"];
   const incColors = ["#34d399", "#60a5fa", "#a78bfa", "#fbbf24", "#fb923c", "#f87171", "#f472b6", "#94a3b8"];
@@ -724,12 +736,20 @@ function Reports() {
 
   const totalProfit = Number(totals.total_profit || 0);
   const monthProfit = Number(monthT.month_profit || 0);
+  const fmtM = (n: number) => `₽ ${Number(n).toLocaleString("ru-RU")}`;
+
+  const pointColors: Record<string, { bg: string; border: string; text: string; bar: string }> = {
+    "Находка": { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", bar: "#60a5fa" },
+    "Волчанец": { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", bar: "#34d399" },
+    "Другая": { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700", bar: "#a78bfa" },
+  };
+  const defaultColor = { bg: "bg-muted", border: "border-border", text: "text-foreground", bar: "#94a3b8" };
 
   return (
     <div className="animate-fade-in space-y-6">
       <div><h1 className="text-2xl font-display font-semibold">Отчёты</h1><p className="text-muted-foreground text-sm mt-1">Аналитика по реальным данным</p></div>
 
-      {/* KPI */}
+      {/* KPI транзакций */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="stat-card">
           <div className="text-xs text-muted-foreground mb-1">Доход за месяц</div>
@@ -747,6 +767,83 @@ function Reports() {
           <div className="text-xs text-muted-foreground mb-1">Прибыль всего</div>
           <div className={`text-2xl font-display font-semibold ${totalProfit >= 0 ? "text-foreground" : "text-red-500"}`}>₽ {totalProfit.toLocaleString()}</div>
         </div>
+      </div>
+
+      {/* ── СТАТИСТИКА ПО ТОЧКАМ ── */}
+      <div>
+        <h2 className="font-semibold text-lg mb-4">Статистика по точкам</h2>
+
+        {/* Общая сводка */}
+        {Number(pointTotals.grand_reports_count) > 0 && (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+            <div className="stat-card">
+              <div className="text-xs text-muted-foreground mb-1">Общая касса (все точки)</div>
+              <div className="text-2xl font-display font-semibold text-foreground">{fmtM(Number(pointTotals.grand_total_cash))}</div>
+            </div>
+            <div className="stat-card">
+              <div className="text-xs text-muted-foreground mb-1">Общий остаток</div>
+              <div className={`text-2xl font-display font-semibold ${Number(pointTotals.grand_total_remainder) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtM(Number(pointTotals.grand_total_remainder))}</div>
+            </div>
+            <div className="stat-card">
+              <div className="text-xs text-muted-foreground mb-1">Всего рабочих дней</div>
+              <div className="text-2xl font-display font-semibold text-foreground">{Number(pointTotals.grand_reports_count)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="text-xs text-muted-foreground mb-1">Средняя касса в день</div>
+              <div className="text-2xl font-display font-semibold text-foreground">{fmtM(Math.round(Number(pointTotals.grand_avg_cash)))}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Карточки по точкам */}
+        {!pointStats.length ? (
+          <div className="bg-card rounded-2xl border border-border p-8 text-center">
+            <Icon name="MapPin" size={36} className="text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">Нет данных — заполни дневные отчёты</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {pointStats.map(p => {
+              const col = pointColors[p.point] || defaultColor;
+              const maxCash = Math.max(...pointStats.map(x => Number(x.total_cash)), 1);
+              const pct = (Number(p.total_cash) / maxCash) * 100;
+              return (
+                <div key={p.point} className={`bg-card rounded-2xl border ${col.border} p-5 space-y-4`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full`} style={{ background: col.bar }} />
+                      <span className={`font-semibold text-lg ${col.text}`}>{p.point}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">{p.reports_count} дней</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={`${col.bg} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Касса всего</div>
+                      <div className="font-semibold text-foreground">{fmtM(Number(p.total_cash))}</div>
+                    </div>
+                    <div className={`${col.bg} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Остаток всего</div>
+                      <div className={`font-semibold ${Number(p.total_remainder) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtM(Number(p.total_remainder))}</div>
+                    </div>
+                    <div className={`${col.bg} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Средняя касса</div>
+                      <div className="font-semibold text-foreground">{fmtM(Math.round(Number(p.avg_cash)))}</div>
+                    </div>
+                    <div className={`${col.bg} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Доля кассы</div>
+                      <div className="font-semibold text-foreground">{Math.round(pct)}%</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: col.bar }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* График по месяцам */}
