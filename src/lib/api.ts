@@ -1,17 +1,31 @@
 const BASE = 'https://functions.poehali.dev/5d75bdb9-edda-4422-995f-ba98d98b5d7c';
 
-async function request(resource: string, method = 'GET', body?: object, params?: Record<string, string>) {
+async function request(resource: string, method = 'GET', body?: object, params?: Record<string, string>, retries = 2): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const url = new URL(BASE);
   url.searchParams.set('resource', resource);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  return JSON.parse(text);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+
+  try {
+    const res = await fetch(url.toString(), {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const text = await res.text();
+    return JSON.parse(text);
+  } catch (e) {
+    clearTimeout(timeout);
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 1000));
+      return request(resource, method, body, params, retries - 1);
+    }
+    throw e;
+  }
 }
 
 export const api = {

@@ -189,8 +189,19 @@ function Dashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { api.dashboard().then(d => { setData(d); setLoading(false); }); }, []);
+  const [error, setError] = useState(false);
+  const load = useCallback(() => {
+    setLoading(true); setError(false);
+    api.dashboard().then(d => { setData(d); setLoading(false); }).catch(() => { setError(true); setLoading(false); });
+  }, []);
+  useEffect(() => { load(); }, [load]);
   if (loading) return <Spinner />;
+  if (error || !data) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div className="text-muted-foreground text-sm">Не удалось загрузить данные</div>
+      <button onClick={load} className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">Повторить</button>
+    </div>
+  );
 
   const today = new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const profit = (Number(data.month_income) || 0) - (Number(data.month_expense) || 0);
@@ -279,7 +290,7 @@ function Clients() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({ full_name: "", phone: "", telegram: "", passport: "", notes: "" });
 
-  const load = useCallback(() => { api.clients.list().then(d => { setItems(d); setLoading(false); }); }, []);
+  const load = useCallback(() => { setLoading(true); api.clients.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
@@ -394,7 +405,7 @@ function Quads() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", model: "", year: "", power: "", hourly_rate: "1800", status: "available", mileage: "0", last_service_date: "", notes: "" });
 
-  const load = useCallback(() => { api.quads.list().then(d => { setItems(d); setLoading(false); }); }, []);
+  const load = useCallback(() => { setLoading(true); api.quads.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
   useEffect(() => { load(); }, [load]);
 
   const changeStatus = async (id: number, status: string) => { await api.quads.update(id, { status }); load(); };
@@ -496,7 +507,8 @@ function Bookings() {
   const [form, setForm] = useState({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
 
   const load = useCallback(() => {
-    Promise.all([api.bookings.list(), api.quads.list(), api.clients.list()]).then(([b, q, c]) => { setItems(b); setQuadsList(q); setClientsList(c); setLoading(false); });
+    setLoading(true);
+    Promise.all([api.bookings.list(), api.quads.list(), api.clients.list()]).then(([b, q, c]) => { setItems(b); setQuadsList(q); setClientsList(c); setLoading(false); }).catch(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -666,8 +678,9 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
   const [form, setForm] = useState({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10) });
 
   const load = useCallback(() => {
+    setLoading(true);
     const params = type !== "all" ? { type } : undefined;
-    api.transactions.list(params).then(d => { setData(d); setLoading(false); });
+    api.transactions.list(params).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   }, [type]);
   useEffect(() => { load(); }, [load]);
 
@@ -804,7 +817,7 @@ function Reports() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { api.reports().then(d => { setData(d); setLoading(false); }); }, []);
+  useEffect(() => { api.reports().then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
   if (loading) return <Spinner />;
 
   const monthly = (data.monthly || []) as { month_key: string; month: string; income: number; expense: number; profit: number }[];
@@ -1069,7 +1082,8 @@ function DailyReports() {
   const [exps, setExps] = useState<ExpRow[]>([emptyExp()]);
 
   const load = useCallback(() => {
-    api.daily_reports.list().then(d => { setReports(d); setLoading(false); });
+    setLoading(true);
+    api.daily_reports.list().then(d => { setReports(d); setLoading(false); }).catch(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -1338,7 +1352,8 @@ function Employees() {
   const [form, setForm] = useState(emptyEmp);
 
   const load = useCallback(() => {
-    api.employees.list().then(d => { setItems(d); setLoading(false); });
+    setLoading(true);
+    api.employees.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
 
