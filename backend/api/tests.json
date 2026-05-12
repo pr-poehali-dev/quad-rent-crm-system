@@ -5,7 +5,7 @@
       "method": "GET",
       "path": "/?resource=dashboard",
       "expectedStatus": 200,
-      "expectedBody": {"total_quads": 3},
+      "expectedBody": {"available_quads": 1},
       "bodyMatcher": "partial"
     },
     {
