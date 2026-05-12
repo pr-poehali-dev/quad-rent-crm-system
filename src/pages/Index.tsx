@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 type Section =
   | "dashboard" | "clients" | "bookings" | "quads"
@@ -189,16 +189,22 @@ function Dashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
-    setLoading(true); setError(false);
-    api.dashboard().then(d => { setData(d); setLoading(false); }).catch(() => { setError(true); setLoading(false); });
+    setLoading(true); setError(null);
+    api.dashboard().then(d => { setData(d); setLoading(false); }).catch((e) => {
+      setError(e instanceof ApiError && e.status === 402
+        ? 'Превышен лимит вычислений. Пополните баланс на poehali.dev'
+        : 'Нет соединения с сервером');
+      setLoading(false);
+    });
   }, []);
   useEffect(() => { load(); }, [load]);
   if (loading) return <Spinner />;
   if (error || !data) return (
-    <div className="flex flex-col items-center justify-center h-64 gap-4">
-      <div className="text-muted-foreground text-sm">Не удалось загрузить данные</div>
+    <div className="flex flex-col items-center justify-center h-64 gap-4 px-6 text-center">
+      <Icon name="WifiOff" size={32} className="text-muted-foreground" />
+      <div className="text-muted-foreground text-sm">{error || 'Не удалось загрузить данные'}</div>
       <button onClick={load} className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">Повторить</button>
     </div>
   );

@@ -1,29 +1,36 @@
 const BASE = 'https://functions.poehali.dev/5d75bdb9-edda-4422-995f-ba98d98b5d7c';
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
 }
 
-async function request(resource: string, method = 'GET', body?: object, params?: Record<string, string>, retries = 3): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+async function request(resource: string, method = 'GET', body?: object, params?: Record<string, string>, retries = 1): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const url = new URL(BASE);
   url.searchParams.set('resource', resource);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   try {
-    const res = await withTimeout(fetch(url.toString(), {
+    const res = await fetch(url.toString(), {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
-    }), 30000);
+    });
+
+    if (res.status === 402) {
+      throw new ApiError(402, 'limit');
+    }
+    if (!res.ok) {
+      throw new ApiError(res.status, `server_error`);
+    }
 
     const text = await res.text();
     return JSON.parse(text);
   } catch (e) {
+    if (e instanceof ApiError) throw e;
     if (retries > 0) {
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 2000));
       return request(resource, method, body, params, retries - 1);
     }
     throw e;
