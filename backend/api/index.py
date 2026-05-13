@@ -97,13 +97,14 @@ def handler(event: dict, context) -> dict:
 
             elif method == 'POST':
                 cur.execute(f"""
-                    INSERT INTO "{S}".quads (name, model, year, power, hourly_rate, status, mileage, last_service_date, notes)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
+                    INSERT INTO "{S}".quads (name, model, year, power, hourly_rate, status, mileage, last_service_date, notes, location)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
                 """, (body['name'], noneify(body.get('model')), noneify(body.get('year')),
                       noneify(body.get('power')), body.get('hourly_rate', 1800) or 1800,
                       body.get('status', 'available') or 'available',
                       body.get('mileage', 0) or 0,
-                      noneify(body.get('last_service_date')), noneify(body.get('notes'))))
+                      noneify(body.get('last_service_date')), noneify(body.get('notes')),
+                      noneify(body.get('location'))))
                 conn.commit()
                 return ok(dict(cur.fetchone()))
 
@@ -112,7 +113,7 @@ def handler(event: dict, context) -> dict:
                 fields = []
                 vals = []
                 date_fields = {'last_service_date', 'next_service_mileage'}
-                for f in ['name','model','year','power','hourly_rate','status','mileage','last_service_date','next_service_mileage','notes']:
+                for f in ['name','model','year','power','hourly_rate','status','mileage','last_service_date','next_service_mileage','notes','location']:
                     if f in body:
                         fields.append(f'{f} = %s')
                         vals.append(noneify(body[f]) if f in date_fields else body[f])

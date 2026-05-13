@@ -1,0 +1,1 @@
+ALTER TABLE t_p21303888_quad_rent_crm_system.quads ADD COLUMN location varchar(100) NULL;

@@ -435,7 +435,7 @@ function Clients() {
 
 // ── КВАДРОЦИКЛЫ ───────────────────────────────────────────────
 
-const emptyQuadForm = { name: "", model: "", year: "", power: "", hourly_rate: "1800", status: "available", mileage: "0", last_service_date: "", notes: "" };
+const emptyQuadForm = { name: "", model: "", year: "", power: "", hourly_rate: "1800", status: "available", mileage: "0", last_service_date: "", notes: "", location: "" };
 
 function Quads() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -464,6 +464,7 @@ function Quads() {
       mileage: String(q.mileage || 0),
       last_service_date: q.last_service_date ? q.last_service_date.slice(0, 10) : "",
       notes: q.notes || "",
+      location: q.location || "",
     });
     setShowModal(true);
   };
@@ -506,6 +507,7 @@ function Quads() {
           <option value="retired">Списан</option>
         </select>
       </Field>
+      <Field label="Точка (локация)"><input className={inputCls} placeholder="Точка 1, Центр, Набережная..." value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></Field>
       <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
     </>
   );
@@ -546,6 +548,7 @@ function Quads() {
                 <span className="flex items-center gap-1"><Icon name="Gauge" size={12} /> {q.mileage} км</span>
                 {q.last_service_date && <span>· ТО: {new Date(q.last_service_date).toLocaleDateString("ru-RU")}</span>}
               </div>
+              {q.location && <div className="flex items-center gap-1 text-xs text-muted-foreground"><Icon name="MapPin" size={11} />{q.location}</div>}
               {q.notes && <div className="text-xs text-muted-foreground">{q.notes}</div>}
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">₽ {q.hourly_rate}/ч</div>
