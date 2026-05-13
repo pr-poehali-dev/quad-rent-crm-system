@@ -287,6 +287,8 @@ function Dashboard() {
 
 // ── КЛИЕНТЫ ───────────────────────────────────────────────────
 
+const emptyClientForm = { full_name: "", phone: "", telegram: "", passport: "", notes: "", is_blacklisted: false, blacklist_reason: "" };
+
 function Clients() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [items, setItems] = useState<any[]>([]);
@@ -294,17 +296,31 @@ function Clients() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [form, setForm] = useState({ full_name: "", phone: "", telegram: "", passport: "", notes: "" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [form, setForm] = useState(emptyClientForm);
 
   const load = useCallback(() => { setLoading(true); api.clients.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
   useEffect(() => { load(); }, [load]);
 
+  const openAdd = () => { setEditItem(null); setForm(emptyClientForm); setShowModal(true); };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const openEdit = (c: any) => {
+    setEditItem(c);
+    setForm({ full_name: c.full_name || "", phone: c.phone || "", telegram: c.telegram || "", passport: c.passport || "", notes: c.notes || "", is_blacklisted: !!c.is_blacklisted, blacklist_reason: c.blacklist_reason || "" });
+    setShowModal(true);
+  };
+
   const save = async () => {
     if (!form.full_name.trim()) return;
     setSaving(true);
-    await api.clients.create(form);
-    setSaving(false); setShowModal(false);
-    setForm({ full_name: "", phone: "", telegram: "", passport: "", notes: "" });
+    if (editItem) {
+      await api.clients.update(editItem.id, form);
+    } else {
+      await api.clients.create(form);
+    }
+    setSaving(false); setShowModal(false); setEditItem(null);
+    setForm(emptyClientForm);
     load();
   };
 
@@ -312,25 +328,36 @@ function Clients() {
 
   if (loading) return <Spinner />;
 
+  const ClientForm = () => (
+    <>
+      <Field label="Имя и фамилия *"><input className={inputCls} placeholder="Алексей Морозов" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></Field>
+      <Field label="Телефон"><input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
+      <Field label="Telegram"><input className={inputCls} placeholder="@username" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} /></Field>
+      <Field label="Паспорт / документ"><input className={inputCls} placeholder="4520 123456" value={form.passport} onChange={e => setForm({ ...form, passport: e.target.value })} /></Field>
+      <Field label="Заметки"><textarea className={inputCls} rows={2} placeholder="VIP, постоянный клиент..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
+      <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
+        <input type="checkbox" id="blacklist" checked={form.is_blacklisted} onChange={e => setForm({ ...form, is_blacklisted: e.target.checked })} className="w-4 h-4 accent-red-600" />
+        <label htmlFor="blacklist" className="text-sm font-medium text-foreground cursor-pointer select-none">Чёрный список</label>
+      </div>
+      {form.is_blacklisted && <Field label="Причина блокировки"><input className={inputCls} placeholder="Причина..." value={form.blacklist_reason} onChange={e => setForm({ ...form, blacklist_reason: e.target.value })} /></Field>}
+    </>
+  );
+
   return (
     <div className="animate-fade-in space-y-6">
       {showModal && (
-        <Modal title="Новый клиент" onClose={() => setShowModal(false)} onSubmit={save} loading={saving}>
-          <Field label="Имя и фамилия *"><input className={inputCls} placeholder="Алексей Морозов" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></Field>
-          <Field label="Телефон"><input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
-          <Field label="Telegram"><input className={inputCls} placeholder="@username" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} /></Field>
-          <Field label="Паспорт / документ"><input className={inputCls} placeholder="4520 123456" value={form.passport} onChange={e => setForm({ ...form, passport: e.target.value })} /></Field>
-          <Field label="Заметки"><textarea className={inputCls} rows={2} placeholder="VIP, постоянный клиент..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
+        <Modal title={editItem ? "Редактировать клиента" : "Новый клиент"} onClose={() => { setShowModal(false); setEditItem(null); }} onSubmit={save} loading={saving}>
+          <ClientForm />
         </Modal>
       )}
       {deleteId !== null && <ConfirmDelete text="Клиент будет удалён из базы" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
       <div className="flex items-center justify-between gap-3">
         <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Клиенты</h1><p className="text-muted-foreground text-sm mt-1">{items.length} клиентов в базе</p></div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить клиента</span><span className="sm:hidden">Добавить</span></button>
+        <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить клиента</span><span className="sm:hidden">Добавить</span></button>
       </div>
 
-      {!items.length ? <Empty icon="Users" text="Клиентов пока нет" action="Добавить клиента" onAction={() => setShowModal(true)} /> : (
+      {!items.length ? <Empty icon="Users" text="Клиентов пока нет" action="Добавить клиента" onAction={openAdd} /> : (
         <>
           {/* Карточки на мобиле */}
           <div className="flex flex-col gap-3 sm:hidden">
@@ -349,14 +376,17 @@ function Clients() {
                       {c.phone && <div className="text-sm text-muted-foreground mt-0.5">{c.phone}</div>}
                       {c.telegram && <div className="text-xs text-muted-foreground">{c.telegram}</div>}
                       {c.notes && <div className="text-xs text-muted-foreground mt-1 italic">{c.notes}</div>}
-                      {c.is_blacklisted && <div className="text-xs text-red-600 font-medium mt-1">⛔ Чёрный список</div>}
+                      {c.is_blacklisted && <div className="text-xs text-red-600 font-medium mt-1">⛔ Чёрный список{c.blacklist_reason ? `: ${c.blacklist_reason}` : ""}</div>}
                       <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border">
                         <span className="text-xs text-muted-foreground">{c.trips_count} поездок</span>
                         <span className="text-xs font-semibold text-foreground">₽ {Number(c.total_spent).toLocaleString()}</span>
                         {c.passport && <span className="text-xs text-muted-foreground truncate">📄 {c.passport}</span>}
                       </div>
                     </div>
-                    <button onClick={() => setDeleteId(c.id)} className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                    <div className="flex flex-col gap-1 flex-shrink-0">
+                      <button onClick={() => openEdit(c)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"><Icon name="Pencil" size={14} /></button>
+                      <button onClick={() => setDeleteId(c.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                    </div>
                   </div>
                 </div>
               );
@@ -379,7 +409,7 @@ function Clients() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-xs font-semibold text-primary">{c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}</div>
-                        <div><span className="text-sm font-medium">{c.full_name}</span>{c.is_blacklisted && <div className="text-[10px] text-red-600 font-medium">Чёрный список</div>}{c.notes && <div className="text-[10px] text-muted-foreground">{c.notes}</div>}</div>
+                        <div><span className="text-sm font-medium">{c.full_name}</span>{c.is_blacklisted && <div className="text-[10px] text-red-600 font-medium">Чёрный список{c.blacklist_reason ? `: ${c.blacklist_reason}` : ""}</div>}{c.notes && <div className="text-[10px] text-muted-foreground">{c.notes}</div>}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{c.phone || "—"}</td>
@@ -387,7 +417,10 @@ function Clients() {
                     <td className="px-6 py-4 text-sm font-medium">₽ {Number(c.total_spent).toLocaleString()}</td>
                     <td className="px-6 py-4"><StatusBadge status={c.is_blacklisted ? "blacklisted" : Number(c.trips_count) > 5 ? "vip" : Number(c.trips_count) === 0 ? "new" : "active"} /></td>
                     <td className="px-6 py-4">
-                      <button onClick={() => setDeleteId(c.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(c)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"><Icon name="Pencil" size={13} /></button>
+                        <button onClick={() => setDeleteId(c.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={13} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
