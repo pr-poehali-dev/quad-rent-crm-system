@@ -86,15 +86,15 @@ function ConfirmDelete({ text, onConfirm, onCancel }: { text: string; onConfirm:
 interface ModalProps { title: string; onClose: () => void; onSubmit: () => void; loading?: boolean; children: React.ReactNode; }
 
 function Modal({ title, onClose, onSubmit, loading, children }: ModalProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div ref={ref} className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl animate-fade-in"
+        onMouseDown={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <h2 className="font-display font-semibold text-foreground">{title}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><Icon name="X" size={16} /></button>
