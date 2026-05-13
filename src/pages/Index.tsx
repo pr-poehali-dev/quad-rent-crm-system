@@ -328,26 +328,20 @@ function Clients() {
 
   if (loading) return <Spinner />;
 
-  const ClientForm = () => (
-    <>
-      <Field label="Имя и фамилия *"><input className={inputCls} placeholder="Алексей Морозов" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></Field>
-      <Field label="Телефон"><input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
-      <Field label="Telegram"><input className={inputCls} placeholder="@username" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} /></Field>
-      <Field label="Паспорт / документ"><input className={inputCls} placeholder="4520 123456" value={form.passport} onChange={e => setForm({ ...form, passport: e.target.value })} /></Field>
-      <Field label="Заметки"><textarea className={inputCls} rows={2} placeholder="VIP, постоянный клиент..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
-      <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
-        <input type="checkbox" id="blacklist" checked={form.is_blacklisted} onChange={e => setForm({ ...form, is_blacklisted: e.target.checked })} className="w-4 h-4 accent-red-600" />
-        <label htmlFor="blacklist" className="text-sm font-medium text-foreground cursor-pointer select-none">Чёрный список</label>
-      </div>
-      {form.is_blacklisted && <Field label="Причина блокировки"><input className={inputCls} placeholder="Причина..." value={form.blacklist_reason} onChange={e => setForm({ ...form, blacklist_reason: e.target.value })} /></Field>}
-    </>
-  );
-
   return (
     <div className="animate-fade-in space-y-6">
       {showModal && (
         <Modal title={editItem ? "Редактировать клиента" : "Новый клиент"} onClose={() => { setShowModal(false); setEditItem(null); }} onSubmit={save} loading={saving}>
-          <ClientForm />
+          <Field label="Имя и фамилия *"><input className={inputCls} placeholder="Алексей Морозов" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></Field>
+          <Field label="Телефон"><input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
+          <Field label="Telegram"><input className={inputCls} placeholder="@username" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} /></Field>
+          <Field label="Паспорт / документ"><input className={inputCls} placeholder="4520 123456" value={form.passport} onChange={e => setForm({ ...form, passport: e.target.value })} /></Field>
+          <Field label="Заметки"><textarea className={inputCls} rows={2} placeholder="VIP, постоянный клиент..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
+          <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
+            <input type="checkbox" id="blacklist" checked={form.is_blacklisted} onChange={e => setForm({ ...form, is_blacklisted: e.target.checked })} className="w-4 h-4 accent-red-600" />
+            <label htmlFor="blacklist" className="text-sm font-medium text-foreground cursor-pointer select-none">Чёрный список</label>
+          </div>
+          {form.is_blacklisted && <Field label="Причина блокировки"><input className={inputCls} placeholder="Причина..." value={form.blacklist_reason} onChange={e => setForm({ ...form, blacklist_reason: e.target.value })} /></Field>}
         </Modal>
       )}
       {deleteId !== null && <ConfirmDelete text="Клиент будет удалён из базы" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
@@ -485,40 +479,34 @@ function Quads() {
   };
   const remove = async (id: number) => { await api.quads.remove(id); setDeleteId(null); load(); };
 
-  const QuadForm = () => (
-    <>
-      <Field label="Название / позывной *"><input className={inputCls} placeholder="Кабан-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Модель"><input className={inputCls} placeholder="Yamaha Grizzly 700" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} /></Field>
-        <Field label="Год"><input className={inputCls} type="number" placeholder="2024" value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} /></Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Мощность"><input className={inputCls} placeholder="62 л.с." value={form.power} onChange={e => setForm({ ...form, power: e.target.value })} /></Field>
-        <Field label="Ставка (₽/ч)"><input className={inputCls} type="number" value={form.hourly_rate} onChange={e => setForm({ ...form, hourly_rate: e.target.value })} /></Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Пробег (км)"><input className={inputCls} type="number" value={form.mileage} onChange={e => setForm({ ...form, mileage: e.target.value })} /></Field>
-        <Field label="Дата ТО"><input className={inputCls} type="date" value={form.last_service_date} onChange={e => setForm({ ...form, last_service_date: e.target.value })} /></Field>
-      </div>
-      <Field label="Статус">
-        <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-          <option value="available">Доступен</option>
-          <option value="maintenance">На ТО</option>
-          <option value="retired">Списан</option>
-        </select>
-      </Field>
-      <Field label="Точка (локация)"><input className={inputCls} placeholder="Точка 1, Центр, Набережная..." value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></Field>
-      <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
-    </>
-  );
-
   if (loading) return <Spinner />;
 
   return (
     <div className="animate-fade-in space-y-6">
       {showModal && (
         <Modal title={editItem ? "Редактировать квадроцикл" : "Добавить квадроцикл"} onClose={() => { setShowModal(false); setEditItem(null); }} onSubmit={save} loading={saving}>
-          <QuadForm />
+          <Field label="Название / позывной *"><input className={inputCls} placeholder="Кабан-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Модель"><input className={inputCls} placeholder="Yamaha Grizzly 700" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} /></Field>
+            <Field label="Год"><input className={inputCls} type="number" placeholder="2024" value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Мощность"><input className={inputCls} placeholder="62 л.с." value={form.power} onChange={e => setForm({ ...form, power: e.target.value })} /></Field>
+            <Field label="Ставка (₽/ч)"><input className={inputCls} type="number" value={form.hourly_rate} onChange={e => setForm({ ...form, hourly_rate: e.target.value })} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Пробег (км)"><input className={inputCls} type="number" value={form.mileage} onChange={e => setForm({ ...form, mileage: e.target.value })} /></Field>
+            <Field label="Дата ТО"><input className={inputCls} type="date" value={form.last_service_date} onChange={e => setForm({ ...form, last_service_date: e.target.value })} /></Field>
+          </div>
+          <Field label="Статус">
+            <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+              <option value="available">Доступен</option>
+              <option value="maintenance">На ТО</option>
+              <option value="retired">Списан</option>
+            </select>
+          </Field>
+          <Field label="Точка (локация)"><input className={inputCls} placeholder="Точка 1, Центр, Набережная..." value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></Field>
+          <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
         </Modal>
       )}
       {deleteId !== null && <ConfirmDelete text="Квадроцикл будет удалён из парка" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
