@@ -1,10 +1,11 @@
 """
 Главный API для CRM проката квадроциклов BogatovTravel.
 Обрабатывает все CRUD операции: квадроциклы, брони, клиенты, финансы.
-v3
+v4
 """
 import json
 import os
+import traceback
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -24,6 +25,12 @@ def ok(data):
 
 def err(msg, code=400):
     return {'statusCode': code, 'headers': CORS_HEADERS, 'body': json.dumps({'error': msg})}
+
+def noneify(val):
+    """Преобразует пустую строку в None — для корректной вставки в БД."""
+    if val == '' or val is None:
+        return None
+    return val
 
 def handler(event: dict, context) -> dict:
     if event.get('httpMethod') == 'OPTIONS':
@@ -92,9 +99,11 @@ def handler(event: dict, context) -> dict:
                 cur.execute(f"""
                     INSERT INTO "{S}".quads (name, model, year, power, hourly_rate, status, mileage, last_service_date, notes)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
-                """, (body['name'], body.get('model'), body.get('year'), body.get('power'),
-                      body.get('hourly_rate', 1800), body.get('status','available'),
-                      body.get('mileage', 0), body.get('last_service_date'), body.get('notes')))
+                """, (body['name'], noneify(body.get('model')), noneify(body.get('year')),
+                      noneify(body.get('power')), body.get('hourly_rate', 1800) or 1800,
+                      body.get('status', 'available') or 'available',
+                      body.get('mileage', 0) or 0,
+                      noneify(body.get('last_service_date')), noneify(body.get('notes'))))
                 conn.commit()
                 return ok(dict(cur.fetchone()))
 
@@ -102,10 +111,11 @@ def handler(event: dict, context) -> dict:
                 qid = params.get('id')
                 fields = []
                 vals = []
+                date_fields = {'last_service_date', 'next_service_mileage'}
                 for f in ['name','model','year','power','hourly_rate','status','mileage','last_service_date','next_service_mileage','notes']:
                     if f in body:
                         fields.append(f'{f} = %s')
-                        vals.append(body[f])
+                        vals.append(noneify(body[f]) if f in date_fields else body[f])
                 vals.append(qid)
                 cur.execute(f'UPDATE "{S}".quads SET {", ".join(fields)} WHERE id = %s RETURNING *', vals)
                 conn.commit()
@@ -529,6 +539,7 @@ def handler(event: dict, context) -> dict:
 
     except Exception as e:
         conn.rollback()
+        print(f"[ERROR] resource={resource} method={method} body={body}: {traceback.format_exc()}")
         return err(str(e), 500)
     finally:
         cur.close()

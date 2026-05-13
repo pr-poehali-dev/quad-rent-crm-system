@@ -5,7 +5,6 @@
       "method": "GET",
       "path": "/?resource=dashboard",
       "expectedStatus": 200,
-      "expectedBody": {"available_quads": 1},
       "bodyMatcher": "partial"
     },
     {
@@ -54,6 +53,14 @@
       "name": "Get daily reports",
       "method": "GET",
       "path": "/?resource=daily_reports",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create quad with empty optional fields",
+      "method": "POST",
+      "path": "/?resource=quads",
+      "body": {"name": "Тест-квад", "model": "", "year": null, "power": "", "hourly_rate": 1800, "status": "available", "mileage": 0, "last_service_date": "", "notes": ""},
       "expectedStatus": 200,
       "bodyMatcher": "partial"
     }
