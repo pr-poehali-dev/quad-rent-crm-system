@@ -402,66 +402,98 @@ function Clients() {
 
 // ── КВАДРОЦИКЛЫ ───────────────────────────────────────────────
 
+const emptyQuadForm = { name: "", model: "", year: "", power: "", hourly_rate: "1800", status: "available", mileage: "0", last_service_date: "", notes: "" };
+
 function Quads() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editItem, setEditItem] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", model: "", year: "", power: "", hourly_rate: "1800", status: "available", mileage: "0", last_service_date: "", notes: "" });
+  const [form, setForm] = useState(emptyQuadForm);
 
   const load = useCallback(() => { setLoading(true); api.quads.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
   useEffect(() => { load(); }, [load]);
+
+  const openAdd = () => { setEditItem(null); setForm(emptyQuadForm); setShowModal(true); };
+  const openEdit = (q: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    setEditItem(q);
+    setForm({
+      name: q.name || "",
+      model: q.model || "",
+      year: q.year ? String(q.year) : "",
+      power: q.power || "",
+      hourly_rate: String(q.hourly_rate || 1800),
+      status: q.status || "available",
+      mileage: String(q.mileage || 0),
+      last_service_date: q.last_service_date ? q.last_service_date.slice(0, 10) : "",
+      notes: q.notes || "",
+    });
+    setShowModal(true);
+  };
 
   const changeStatus = async (id: number, status: string) => { await api.quads.update(id, { status }); load(); };
   const save = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
-    await api.quads.create({ ...form, year: Number(form.year) || null, hourly_rate: Number(form.hourly_rate) || 1800, mileage: Number(form.mileage) || 0 });
-    setSaving(false); setShowModal(false);
-    setForm({ name: "", model: "", year: "", power: "", hourly_rate: "1800", status: "available", mileage: "0", last_service_date: "", notes: "" });
+    const data = { ...form, year: Number(form.year) || null, hourly_rate: Number(form.hourly_rate) || 1800, mileage: Number(form.mileage) || 0 };
+    if (editItem) {
+      await api.quads.update(editItem.id, data);
+    } else {
+      await api.quads.create(data);
+    }
+    setSaving(false); setShowModal(false); setEditItem(null);
+    setForm(emptyQuadForm);
     load();
   };
   const remove = async (id: number) => { await api.quads.remove(id); setDeleteId(null); load(); };
+
+  const QuadForm = () => (
+    <>
+      <Field label="Название / позывной *"><input className={inputCls} placeholder="Кабан-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Модель"><input className={inputCls} placeholder="Yamaha Grizzly 700" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} /></Field>
+        <Field label="Год"><input className={inputCls} type="number" placeholder="2024" value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Мощность"><input className={inputCls} placeholder="62 л.с." value={form.power} onChange={e => setForm({ ...form, power: e.target.value })} /></Field>
+        <Field label="Ставка (₽/ч)"><input className={inputCls} type="number" value={form.hourly_rate} onChange={e => setForm({ ...form, hourly_rate: e.target.value })} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Пробег (км)"><input className={inputCls} type="number" value={form.mileage} onChange={e => setForm({ ...form, mileage: e.target.value })} /></Field>
+        <Field label="Дата ТО"><input className={inputCls} type="date" value={form.last_service_date} onChange={e => setForm({ ...form, last_service_date: e.target.value })} /></Field>
+      </div>
+      <Field label="Статус">
+        <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+          <option value="available">Доступен</option>
+          <option value="maintenance">На ТО</option>
+          <option value="retired">Списан</option>
+        </select>
+      </Field>
+      <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
+    </>
+  );
 
   if (loading) return <Spinner />;
 
   return (
     <div className="animate-fade-in space-y-6">
       {showModal && (
-        <Modal title="Добавить квадроцикл" onClose={() => setShowModal(false)} onSubmit={save} loading={saving}>
-          <Field label="Название / позывной *"><input className={inputCls} placeholder="Кабан-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Модель"><input className={inputCls} placeholder="Yamaha Grizzly 700" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} /></Field>
-            <Field label="Год"><input className={inputCls} type="number" placeholder="2024" value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} /></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Мощность"><input className={inputCls} placeholder="62 л.с." value={form.power} onChange={e => setForm({ ...form, power: e.target.value })} /></Field>
-            <Field label="Ставка (₽/ч)"><input className={inputCls} type="number" value={form.hourly_rate} onChange={e => setForm({ ...form, hourly_rate: e.target.value })} /></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Пробег (км)"><input className={inputCls} type="number" value={form.mileage} onChange={e => setForm({ ...form, mileage: e.target.value })} /></Field>
-            <Field label="Дата ТО"><input className={inputCls} type="date" value={form.last_service_date} onChange={e => setForm({ ...form, last_service_date: e.target.value })} /></Field>
-          </div>
-          <Field label="Статус">
-            <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              <option value="available">Доступен</option>
-              <option value="maintenance">На ТО</option>
-              <option value="retired">Списан</option>
-            </select>
-          </Field>
-          <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
+        <Modal title={editItem ? "Редактировать квадроцикл" : "Добавить квадроцикл"} onClose={() => { setShowModal(false); setEditItem(null); }} onSubmit={save} loading={saving}>
+          <QuadForm />
         </Modal>
       )}
       {deleteId !== null && <ConfirmDelete text="Квадроцикл будет удалён из парка" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
 
       <div className="flex items-center justify-between gap-3">
         <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Квадроциклы</h1><p className="text-muted-foreground text-sm mt-1">{items.length} единиц техники</p></div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить технику</span><span className="sm:hidden">Добавить</span></button>
+        <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить технику</span><span className="sm:hidden">Добавить</span></button>
       </div>
 
-      {!items.length ? <Empty icon="Bike" text="Техника не добавлена" action="Добавить квадроцикл" onAction={() => setShowModal(true)} /> : (
+      {!items.length ? <Empty icon="Bike" text="Техника не добавлена" action="Добавить квадроцикл" onAction={openAdd} /> : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {items.map(q => (
             <div key={q.id} className="bg-card rounded-2xl border border-border p-6 space-y-4">
@@ -473,6 +505,7 @@ function Quads() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={q.status} />
+                  <button onClick={() => openEdit(q)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"><Icon name="Pencil" size={13} /></button>
                   <button onClick={() => setDeleteId(q.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={13} /></button>
                 </div>
               </div>
