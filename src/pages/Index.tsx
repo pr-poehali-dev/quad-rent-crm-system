@@ -965,6 +965,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{t.category}</span>
                     {isAll && <StatusBadge status={t.type} />}
+                    {t.point && <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md">📍 {t.point}</span>}
                   </div>
                   {t.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{t.description}</div>}
                   <div className="text-xs text-muted-foreground mt-0.5">{t.transaction_date}</div>
@@ -989,6 +990,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                 <thead><tr className="border-b border-border">
                   {isAll && <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Тип</th>}
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Категория</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Точка</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Описание</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Дата</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Сумма</th>
@@ -999,6 +1001,11 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                     <tr key={t.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       {isAll && <td className="px-5 py-4"><StatusBadge status={t.type} /></td>}
                       <td className="px-5 py-4 text-sm font-medium">{t.category}</td>
+                      <td className="px-5 py-4 text-sm">
+                        {t.point
+                          ? <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium">📍 {t.point}</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{t.description || "—"}</td>
                       <td className="px-5 py-4 text-sm">{t.transaction_date}</td>
                       <td className={`px-5 py-4 text-sm font-semibold ${t.type === "income" ? "text-emerald-600" : "text-red-500"}`}>
@@ -1012,7 +1019,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                 </tbody>
                 {!isAll && (
                   <tfoot><tr className="border-t border-border bg-muted/30">
-                    <td colSpan={3} className="px-5 py-4 text-sm font-semibold">Итого</td>
+                    <td colSpan={4} className="px-5 py-4 text-sm font-semibold">Итого</td>
                     <td className={`px-5 py-4 text-sm font-bold ${type === "income" ? "text-emerald-600" : "text-red-500"}`}>₽ {Number(total || 0).toLocaleString()}</td>
                     <td />
                   </tr></tfoot>
