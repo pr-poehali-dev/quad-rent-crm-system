@@ -95,4 +95,11 @@ export const api = {
     update: (id: number, data: object) => request('certificates', 'PUT', data, { id: String(id) }),
     remove: (id: number) => request('certificates', 'DELETE', undefined, { id: String(id) }),
   },
+
+  point_goals: {
+    list: () => request('point_goals'),
+    create: (data: object) => request('point_goals', 'POST', data),
+    update: (id: number, data: object) => request('point_goals', 'PUT', data, { id: String(id) }),
+    remove: (id: number) => request('point_goals', 'DELETE', undefined, { id: String(id) }),
+  },
 };

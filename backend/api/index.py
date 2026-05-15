@@ -620,6 +620,63 @@ def handler(event: dict, context) -> dict:
                 conn.commit()
                 return ok({'deleted': True})
 
+        # ── POINT GOALS ────────────────────────────────────────
+        if resource == 'point_goals':
+            if method == 'GET':
+                cur.execute(f"""
+                    SELECT g.*,
+                      COALESCE((
+                        SELECT SUM(dr.total_cash)
+                        FROM "{S}".daily_reports dr
+                        WHERE dr.point = g.point
+                          AND dr.report_date <= g.deadline
+                      ), 0) AS earned
+                    FROM "{S}".point_goals g
+                    ORDER BY g.deadline ASC, g.id ASC
+                """)
+                rows = []
+                for r in cur.fetchall():
+                    d = dict(r)
+                    d['deadline'] = str(d['deadline'])
+                    d['created_at'] = str(d['created_at'])
+                    d['updated_at'] = str(d['updated_at'])
+                    rows.append(d)
+                return ok(rows)
+
+            if method == 'POST':
+                cur.execute(f"""
+                    INSERT INTO "{S}".point_goals (point, goal_amount, deadline, label)
+                    VALUES (%s, %s, %s, %s) RETURNING *
+                """, (body['point'], float(body['goal_amount']),
+                      body['deadline'], noneify(body.get('label'))))
+                conn.commit()
+                row = dict(cur.fetchone())
+                row['deadline'] = str(row['deadline'])
+                row['created_at'] = str(row['created_at'])
+                row['updated_at'] = str(row['updated_at'])
+                return ok(row)
+
+            if method == 'PUT':
+                gid = params.get('id')
+                cur.execute(f"""
+                    UPDATE "{S}".point_goals
+                    SET point=%s, goal_amount=%s, deadline=%s, label=%s, updated_at=NOW()
+                    WHERE id=%s RETURNING *
+                """, (body['point'], float(body['goal_amount']),
+                      body['deadline'], noneify(body.get('label')), gid))
+                conn.commit()
+                row = dict(cur.fetchone())
+                row['deadline'] = str(row['deadline'])
+                row['created_at'] = str(row['created_at'])
+                row['updated_at'] = str(row['updated_at'])
+                return ok(row)
+
+            if method == 'DELETE':
+                gid = params.get('id')
+                cur.execute(f'DELETE FROM "{S}".point_goals WHERE id=%s', (gid,))
+                conn.commit()
+                return ok({'deleted': True})
+
         return err('Unknown resource')
 
     except Exception as e:

@@ -899,7 +899,36 @@ function Reports() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { api.reports().then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [goals, setGoals] = useState<any[]>([]);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [deleteGoalId, setDeleteGoalId] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editGoal, setEditGoal] = useState<any | null>(null);
+  const [goalForm, setGoalForm] = useState({ point: "Находка", goal_amount: "", deadline: "", label: "" });
+
+  useEffect(() => {
+    api.reports().then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    api.point_goals.list().then(setGoals).catch(() => {});
+  }, []);
+
+  const openAddGoal = () => { setEditGoal(null); setGoalForm({ point: "Находка", goal_amount: "", deadline: "", label: "" }); setShowGoalModal(true); };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const openEditGoal = (g: any) => { setEditGoal(g); setGoalForm({ point: g.point, goal_amount: String(g.goal_amount), deadline: g.deadline, label: g.label || "" }); setShowGoalModal(true); };
+  const saveGoal = async () => {
+    if (!goalForm.goal_amount || !goalForm.deadline) return;
+    setSavingGoal(true);
+    const payload = { ...goalForm, goal_amount: parseFloat(goalForm.goal_amount) };
+    if (editGoal) { await api.point_goals.update(editGoal.id, payload); } else { await api.point_goals.create(payload); }
+    setSavingGoal(false); setShowGoalModal(false); setEditGoal(null);
+    api.point_goals.list().then(setGoals).catch(() => {});
+  };
+  const removeGoal = async (id: number) => {
+    await api.point_goals.remove(id); setDeleteGoalId(null);
+    api.point_goals.list().then(setGoals).catch(() => {});
+  };
+
   if (loading) return <Spinner />;
 
   const monthly = (data.monthly || []) as { month_key: string; month: string; income: number; expense: number; profit: number }[];
@@ -934,9 +963,112 @@ function Reports() {
   };
   const defaultColor = { bg: "bg-muted", border: "border-border", text: "text-foreground", bar: "#94a3b8" };
 
+  const fmtGoalDate = (s: string) => { try { return new Date(s).toLocaleDateString("ru-RU"); } catch { return s; } };
+
   return (
     <div className="animate-fade-in space-y-6">
       <div><h1 className="text-xl sm:text-2xl font-display font-semibold">Отчёты</h1><p className="text-muted-foreground text-sm mt-1">Аналитика по реальным данным</p></div>
+
+      {/* ── ЦЕЛИ ПО ТОЧКАМ ── */}
+      {showGoalModal && (
+        <Modal title={editGoal ? "Редактировать цель" : "Новая цель"} onClose={() => { setShowGoalModal(false); setEditGoal(null); }} onSubmit={saveGoal} loading={savingGoal}>
+          <Field label="Точка">
+            <select className={selectCls} value={goalForm.point} onChange={e => setGoalForm({ ...goalForm, point: e.target.value })}>
+              <option>Находка</option>
+              <option>Волчанец</option>
+              <option>Другая</option>
+            </select>
+          </Field>
+          <Field label="Название цели (необязательно)"><input className={inputCls} placeholder="Напр: план на лето" value={goalForm.label} onChange={e => setGoalForm({ ...goalForm, label: e.target.value })} /></Field>
+          <Field label="Целевая касса, ₽"><input className={inputCls} type="number" placeholder="500000" value={goalForm.goal_amount} onChange={e => setGoalForm({ ...goalForm, goal_amount: e.target.value })} /></Field>
+          <Field label="Дедлайн"><input className={inputCls} type="date" value={goalForm.deadline} onChange={e => setGoalForm({ ...goalForm, deadline: e.target.value })} /></Field>
+        </Modal>
+      )}
+      {deleteGoalId !== null && <ConfirmDelete text="Цель будет удалена" onConfirm={() => removeGoal(deleteGoalId)} onCancel={() => setDeleteGoalId(null)} />}
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-lg">Цели по точкам</h2>
+          <button onClick={openAddGoal} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
+            <Icon name="Plus" size={15} />Добавить цель
+          </button>
+        </div>
+
+        {!goals.length ? (
+          <div className="bg-card rounded-2xl border border-border p-8 text-center">
+            <Icon name="Target" size={36} className="text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">Цели не заданы — нажми «Добавить цель», чтобы поставить план по кассе</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {goals.map(g => {
+              const col = ({"Находка": { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", bar: "#60a5fa", barBg: "bg-blue-100" }, "Волчанец": { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", bar: "#34d399", barBg: "bg-emerald-100" }, "Другая": { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700", bar: "#a78bfa", barBg: "bg-violet-100" }} as Record<string, {bg:string;border:string;text:string;bar:string;barBg:string}>)[g.point] || { bg: "bg-muted", border: "border-border", text: "text-foreground", bar: "#94a3b8", barBg: "bg-muted" };
+              const earned = Number(g.earned || 0);
+              const goal = Number(g.goal_amount);
+              const pct = goal > 0 ? Math.min(Math.round((earned / goal) * 100), 100) : 0;
+              const remaining = Math.max(goal - earned, 0);
+              const today = new Date();
+              const deadline = new Date(g.deadline);
+              const daysLeft = Math.max(Math.ceil((deadline.getTime() - today.getTime()) / 86400000), 0);
+              const dailyNeeded = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining;
+              const done = earned >= goal;
+              return (
+                <div key={g.id} className={`bg-card rounded-2xl border ${col.border} p-5 space-y-4`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: col.bar }} />
+                        <span className={`font-semibold text-base ${col.text}`}>{g.point}</span>
+                        {done && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Выполнена ✓</span>}
+                      </div>
+                      {g.label && <div className="text-xs text-muted-foreground ml-4">{g.label}</div>}
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button onClick={() => openEditGoal(g)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"><Icon name="Pencil" size={13} /></button>
+                      <button onClick={() => setDeleteGoalId(g.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={13} /></button>
+                    </div>
+                  </div>
+
+                  {/* Прогресс-бар */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                      <span>Заработано: <span className="font-semibold text-foreground">₽ {earned.toLocaleString("ru-RU")}</span></span>
+                      <span className="font-semibold">{pct}%</span>
+                    </div>
+                    <div className={`h-3 ${col.barBg} rounded-full overflow-hidden`}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: col.bar }} />
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 text-right">Цель: ₽ {goal.toLocaleString("ru-RU")} · до {fmtGoalDate(g.deadline)}</div>
+                  </div>
+
+                  {/* Метрики */}
+                  {!done && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className={`${col.bg} rounded-xl p-3 text-center`}>
+                        <div className="text-[10px] text-muted-foreground mb-0.5">Осталось</div>
+                        <div className="font-bold text-sm text-foreground">₽ {remaining.toLocaleString("ru-RU")}</div>
+                      </div>
+                      <div className={`${col.bg} rounded-xl p-3 text-center`}>
+                        <div className="text-[10px] text-muted-foreground mb-0.5">Дней</div>
+                        <div className={`font-bold text-sm ${daysLeft <= 3 ? "text-red-500" : daysLeft <= 7 ? "text-amber-500" : "text-foreground"}`}>{daysLeft}</div>
+                      </div>
+                      <div className={`${col.bg} rounded-xl p-3 text-center`}>
+                        <div className="text-[10px] text-muted-foreground mb-0.5">Касса/день</div>
+                        <div className="font-bold text-sm text-foreground">₽ {dailyNeeded.toLocaleString("ru-RU")}</div>
+                      </div>
+                    </div>
+                  )}
+                  {done && (
+                    <div className={`${col.bg} rounded-xl p-3 text-center`}>
+                      <div className="text-sm font-semibold text-emerald-600">Цель достигнута! Перевыполнение: ₽ {(earned - goal).toLocaleString("ru-RU")}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* KPI транзакций */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">

@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS point_goals (
+  id SERIAL PRIMARY KEY,
+  point VARCHAR(100) NOT NULL,
+  goal_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  deadline DATE NOT NULL,
+  label VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);

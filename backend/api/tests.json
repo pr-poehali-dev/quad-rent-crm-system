@@ -71,6 +71,13 @@
       "bodyMatcher": "partial"
     },
     {
+      "name": "Get point goals",
+      "method": "GET",
+      "path": "/?resource=point_goals",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
       "name": "Create quad with empty optional fields",
       "method": "POST",
       "path": "/?resource=quads",
