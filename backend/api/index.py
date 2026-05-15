@@ -326,8 +326,10 @@ def handler(event: dict, context) -> dict:
                     vals.append(ttype)
                 where_sql = ('WHERE ' + ' AND '.join(where)) if where else ''
                 cur.execute(f"""
-                    SELECT t.*, b.id as booking_ref
-                    FROM "{S}".transactions t LEFT JOIN "{S}".bookings b ON b.id = t.booking_id
+                    SELECT t.*, b.id as booking_ref, q.name as quad_name, q.id as quad_id_ref
+                    FROM "{S}".transactions t
+                    LEFT JOIN "{S}".bookings b ON b.id = t.booking_id
+                    LEFT JOIN "{S}".quads q ON q.id = COALESCE(t.quad_id, b.quad_id)
                     {where_sql}
                     ORDER BY t.transaction_date DESC, t.created_at DESC
                 """, vals)
@@ -345,11 +347,11 @@ def handler(event: dict, context) -> dict:
 
             elif method == 'POST':
                 cur.execute(f"""
-                    INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date, point)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *
+                    INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date, point, quad_id)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
                 """, (body['type'], body['category'], body['amount'],
                       body.get('description'), body.get('booking_id'), body.get('transaction_date', 'today'),
-                      body.get('point') or None))
+                      body.get('point') or None, body.get('quad_id') or None))
                 conn.commit()
                 return ok(dict(cur.fetchone()))
 
@@ -499,16 +501,32 @@ def handler(event: dict, context) -> dict:
             month_totals = dict(cur.fetchone())
             month_totals['month_profit'] = month_totals['month_income'] - month_totals['month_expense']
 
-            # Статистика по технике
+            # Доход по каждому квадру (от завершённых аренд)
             cur.execute(f"""
-                SELECT q.name, q.hourly_rate,
+                SELECT q.id, q.name, q.hourly_rate,
                   COUNT(b.id) as trips,
                   COALESCE(SUM(b.amount),0) as revenue,
                   COALESCE(SUM(b.duration_hours),0) as total_hours
-                FROM "{S}".quads q LEFT JOIN "{S}".bookings b ON b.quad_id = q.id AND b.status = 'returned'
+                FROM "{S}".quads q
+                LEFT JOIN "{S}".bookings b ON b.quad_id = q.id AND b.status = 'returned'
                 GROUP BY q.id, q.name, q.hourly_rate ORDER BY revenue DESC
             """)
-            quad_stats = [dict(r) for r in cur.fetchall()]
+            quad_stats_base = [dict(r) for r in cur.fetchall()]
+
+            # Расходы по каждому квадру (через quad_id в транзакциях)
+            cur.execute(f"""
+                SELECT q.id,
+                  COALESCE(SUM(CASE WHEN t.type='expense' THEN t.amount END),0) as expenses
+                FROM "{S}".quads q
+                LEFT JOIN "{S}".transactions t ON t.quad_id = q.id
+                GROUP BY q.id
+            """)
+            quad_expenses = {r['id']: int(r['expenses']) for r in cur.fetchall()}
+
+            for qs in quad_stats_base:
+                qs['expenses'] = quad_expenses.get(qs['id'], 0)
+                qs['profit'] = int(qs['revenue']) - qs['expenses']
+            quad_stats = quad_stats_base
 
             # Статистика бронирований
             cur.execute(f"""

@@ -959,21 +959,25 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const isAll = type === "all";
   const defCat = type === "income" ? "Аренда" : "ТО и ремонт";
-  const [form, setForm] = useState({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10), point: "" });
+  const [quads, setQuads] = useState<{ id: number; name: string }[]>([]);
+  const [form, setForm] = useState({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10), point: "", quad_id: "" });
 
   const load = useCallback(() => {
     setLoading(true);
     const params = type !== "all" ? { type } : undefined;
     api.transactions.list(params).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   }, [type]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    api.quads.list().then((qs: { id: number; name: string }[]) => setQuads(qs)).catch(() => {});
+  }, [load]);
 
   const save = async () => {
     if (!form.category || !form.amount) return;
     setSaving(true);
-    await api.transactions.create({ ...form, amount: Number(form.amount), point: form.point || null });
+    await api.transactions.create({ ...form, amount: Number(form.amount), point: form.point || null, quad_id: form.quad_id ? Number(form.quad_id) : null });
     setSaving(false); setShowModal(false);
-    setForm({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10), point: "" });
+    setForm({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10), point: "", quad_id: "" });
     load();
   };
   const remove = async (id: number) => { await api.transactions.remove(id); setDeleteId(null); load(); };
@@ -1015,6 +1019,12 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
             </Field>
             <Field label="Дата"><input className={inputCls} type="date" value={form.transaction_date} onChange={e => setForm({ ...form, transaction_date: e.target.value })} /></Field>
           </div>
+          <Field label="Квадроцикл">
+            <select className={selectCls} value={form.quad_id} onChange={e => setForm({ ...form, quad_id: e.target.value })}>
+              <option value="">— Не привязывать —</option>
+              {quads.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
+            </select>
+          </Field>
           <Field label="Описание"><textarea className={inputCls} rows={2} placeholder="Подробности..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></Field>
         </Modal>
       )}
@@ -1050,6 +1060,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                     <span className="text-sm font-medium">{t.category}</span>
                     {isAll && <StatusBadge status={t.type} />}
                     {t.point && <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md">📍 {t.point}</span>}
+                    {t.quad_name && <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-md">🏍 {t.quad_name}</span>}
                   </div>
                   {t.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{t.description}</div>}
                   <div className="text-xs text-muted-foreground mt-0.5">{t.transaction_date}</div>
@@ -1075,6 +1086,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                   {isAll && <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Тип</th>}
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Категория</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Точка</th>
+                  <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Квадроцикл</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Описание</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Дата</th>
                   <th className="text-left text-xs text-muted-foreground font-medium px-5 py-4">Сумма</th>
@@ -1090,6 +1102,11 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                           ? <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium">📍 {t.point}</span>
                           : <span className="text-muted-foreground">—</span>}
                       </td>
+                      <td className="px-5 py-4 text-sm">
+                        {t.quad_name
+                          ? <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full font-medium">🏍 {t.quad_name}</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{t.description || "—"}</td>
                       <td className="px-5 py-4 text-sm">{t.transaction_date}</td>
                       <td className={`px-5 py-4 text-sm font-semibold ${t.type === "income" ? "text-emerald-600" : "text-red-500"}`}>
@@ -1103,7 +1120,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
                 </tbody>
                 {!isAll && (
                   <tfoot><tr className="border-t border-border bg-muted/30">
-                    <td colSpan={4} className="px-5 py-4 text-sm font-semibold">Итого</td>
+                    <td colSpan={5} className="px-5 py-4 text-sm font-semibold">Итого</td>
                     <td className={`px-5 py-4 text-sm font-bold ${type === "income" ? "text-emerald-600" : "text-red-500"}`}>₽ {Number(total || 0).toLocaleString()}</td>
                     <td />
                   </tr></tfoot>
@@ -1167,7 +1184,7 @@ function Reports() {
   const incCats = (data.income_by_category || []) as { category: string; total: number }[];
   const totals = data.totals || {};
   const monthT = data.month_totals || {};
-  const quadStats = (data.quad_stats || []) as { name: string; trips: number; revenue: number; total_hours: number }[];
+  const quadStats = (data.quad_stats || []) as { id: number; name: string; trips: number; revenue: number; total_hours: number; expenses: number; profit: number }[];
   const pointStats = (data.point_stats || []) as { point: string; reports_count: number; total_cash: number; total_remainder: number; avg_cash: number }[];
   const pointTotals = data.point_totals || {};
 
@@ -1424,23 +1441,37 @@ function Reports() {
       {/* Доходность техники */}
       <div className="bg-card rounded-2xl border border-border p-6">
         <h2 className="font-semibold mb-4">Доходность техники</h2>
-        {!quadStats.length || quadStats.every(q => q.trips === 0) ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">Нет завершённых аренд</p>
+        {!quadStats.length ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Техника не добавлена</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {quadStats.map(q => {
+              const rev = Number(q.revenue);
+              const exp = Number(q.expenses);
+              const prof = Number(q.profit);
               const maxRev = Math.max(...quadStats.map(x => Number(x.revenue)), 1);
-              const pct = (Number(q.revenue) / maxRev) * 100;
+              const pct = (rev / maxRev) * 100;
               return (
-                <div key={q.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{q.name}</span>
-                    <div className="flex items-center gap-4 text-muted-foreground text-xs">
-                      <span>{q.trips} поездок · {Number(q.total_hours).toFixed(0)} ч</span>
-                      <span className="text-emerald-600 font-semibold text-sm">₽ {Number(q.revenue).toLocaleString()}</span>
+                <div key={q.name} className="space-y-2 pb-4 border-b border-border last:border-0 last:pb-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">🏍 {q.name}</span>
+                    <span className="text-xs text-muted-foreground">{q.trips} поездок · {Number(q.total_hours).toFixed(0)} ч</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-emerald-50 rounded-xl p-2.5">
+                      <div className="text-xs text-muted-foreground mb-0.5">Оборот</div>
+                      <div className="text-sm font-semibold text-emerald-700">₽ {rev.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-red-50 rounded-xl p-2.5">
+                      <div className="text-xs text-muted-foreground mb-0.5">Расходы</div>
+                      <div className="text-sm font-semibold text-red-600">₽ {exp.toLocaleString()}</div>
+                    </div>
+                    <div className={`${prof >= 0 ? "bg-blue-50" : "bg-red-50"} rounded-xl p-2.5`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Чистая прибыль</div>
+                      <div className={`text-sm font-semibold ${prof >= 0 ? "text-blue-700" : "text-red-600"}`}>₽ {prof.toLocaleString()}</div>
                     </div>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
