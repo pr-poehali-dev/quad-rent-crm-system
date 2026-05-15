@@ -620,7 +620,7 @@ function Bookings() {
           <Field label="Квадроцикл *">
             <select className={selectCls} value={form.quad_id} onChange={e => { const amt = calcAmount(e.target.value, form.duration_hours); setForm({ ...form, quad_id: e.target.value, amount: amt }); }}>
               <option value="">— Выберите квадроцикл —</option>
-              {quadsList.filter(q => q.status === "available").map(q => <option key={q.id} value={q.id}>{q.name} — ₽{q.hourly_rate}/ч</option>)}
+              {quadsList.map(q => <option key={q.id} value={q.id}>{q.name} — ₽{q.hourly_rate}/ч{q.status !== "available" ? ` (${q.status === "rented" ? "занят" : q.status === "maintenance" ? "ТО" : q.status})` : ""}</option>)}
             </select>
           </Field>
           <Field label="Клиент *">

@@ -637,10 +637,10 @@ def handler(event: dict, context) -> dict:
                 cur.execute(f"""
                     SELECT g.*,
                       COALESCE((
-                        SELECT SUM(dr.total_cash)
-                        FROM "{S}".daily_reports dr
-                        WHERE dr.point = g.point
-                          AND dr.report_date <= g.deadline
+                        SELECT SUM(t.amount)
+                        FROM "{S}".transactions t
+                        WHERE t.type = 'income'
+                          AND t.transaction_date <= g.deadline
                       ), 0) AS earned
                     FROM "{S}".point_goals g
                     ORDER BY g.deadline ASC, g.id ASC
