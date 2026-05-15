@@ -281,6 +281,90 @@ function Dashboard() {
           <div className="text-xs text-blue-600 mt-1 flex items-center gap-1"><Icon name="Users" size={12} /> в базе</div>
         </div>
       </div>
+
+      {/* Отчёт за день */}
+      <div>
+        <h2 className="font-semibold text-lg text-foreground mb-3">Отчёт за сегодня</h2>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          <div className="stat-card">
+            <div className="text-xs text-muted-foreground mb-1">Доход за день</div>
+            <div className="text-xl sm:text-2xl font-display font-semibold text-emerald-600">₽ {Number(data.today_totals?.day_income || 0).toLocaleString()}</div>
+          </div>
+          <div className="stat-card">
+            <div className="text-xs text-muted-foreground mb-1">Расход за день</div>
+            <div className="text-xl sm:text-2xl font-display font-semibold text-red-500">₽ {Number(data.today_totals?.day_expense || 0).toLocaleString()}</div>
+          </div>
+          <div className="stat-card col-span-2">
+            <div className="text-xs text-muted-foreground mb-1">Прибыль за день</div>
+            {(() => { const p = Number(data.today_totals?.day_income || 0) - Number(data.today_totals?.day_expense || 0); return <div className={`text-xl sm:text-2xl font-display font-semibold ${p >= 0 ? "text-foreground" : "text-red-500"}`}>₽ {p.toLocaleString()}</div>; })()}
+          </div>
+        </div>
+      </div>
+
+      {/* Отчёт за месяц */}
+      <div>
+        <h2 className="font-semibold text-lg text-foreground mb-3">Отчёт за месяц</h2>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          <div className="stat-card">
+            <div className="text-xs text-muted-foreground mb-1">Доход за месяц</div>
+            <div className="text-xl sm:text-2xl font-display font-semibold text-emerald-600">₽ {(Number(data.month_income) || 0).toLocaleString()}</div>
+          </div>
+          <div className="stat-card">
+            <div className="text-xs text-muted-foreground mb-1">Расход за месяц</div>
+            <div className="text-xl sm:text-2xl font-display font-semibold text-red-500">₽ {(Number(data.month_expense) || 0).toLocaleString()}</div>
+          </div>
+          <div className="stat-card col-span-2">
+            <div className="text-xs text-muted-foreground mb-1">Прибыль за месяц</div>
+            <div className={`text-xl sm:text-2xl font-display font-semibold ${profit >= 0 ? "text-foreground" : "text-red-500"}`}>₽ {profit.toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Статистика по точкам */}
+      {(data.month_by_point || []).length > 0 && (
+        <div>
+          <h2 className="font-semibold text-lg text-foreground mb-3">По точкам за месяц</h2>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {(data.month_by_point as { point: string; month_income: number; month_expense: number }[]).map(p => {
+              const ptProfit = Number(p.month_income) - Number(p.month_expense);
+              const isVolchanets = p.point === "Волчанец";
+              const borderCol = isVolchanets ? "border-violet-200" : "border-teal-200";
+              const dotCol = isVolchanets ? "#7c3aed" : "#0d9488";
+              const textCol = isVolchanets ? "text-violet-700" : "text-teal-700";
+              const bgSub = isVolchanets ? "bg-violet-50" : "bg-teal-50";
+              const todayP = (data.today_by_point as { point: string; day_income: number; day_expense: number }[] || []).find(x => x.point === p.point);
+              return (
+                <div key={p.point} className={`bg-card rounded-2xl border ${borderCol} p-5 space-y-4`}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dotCol }} />
+                    <span className={`font-semibold text-lg ${textCol}`}>📍 {p.point}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={`${bgSub} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Доход за месяц</div>
+                      <div className="font-semibold text-emerald-700">₽ {Number(p.month_income).toLocaleString()}</div>
+                    </div>
+                    <div className={`${bgSub} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Расход за месяц</div>
+                      <div className="font-semibold text-red-600">₽ {Number(p.month_expense).toLocaleString()}</div>
+                    </div>
+                    <div className={`${bgSub} rounded-xl p-3`}>
+                      <div className="text-xs text-muted-foreground mb-0.5">Прибыль за месяц</div>
+                      <div className={`font-semibold ${ptProfit >= 0 ? "text-foreground" : "text-red-500"}`}>₽ {ptProfit.toLocaleString()}</div>
+                    </div>
+                    {todayP && (
+                      <div className={`${bgSub} rounded-xl p-3`}>
+                        <div className="text-xs text-muted-foreground mb-0.5">Доход за сегодня</div>
+                        <div className="font-semibold text-emerald-700">₽ {Number(todayP.day_income).toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

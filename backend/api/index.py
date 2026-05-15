@@ -87,6 +87,41 @@ def handler(event: dict, context) -> dict:
             """)
             stats['recent_transactions'] = [dict(r) for r in cur.fetchall()]
 
+            # Доход/расход/прибыль за месяц по каждой точке
+            cur.execute(f"""
+                SELECT
+                  point,
+                  COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) AS month_income,
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS month_expense
+                FROM "{S}".transactions
+                WHERE DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
+                  AND point IS NOT NULL AND point != ''
+                GROUP BY point ORDER BY month_income DESC
+            """)
+            stats['month_by_point'] = [dict(r) for r in cur.fetchall()]
+
+            # Доход/расход/прибыль за сегодня по каждой точке
+            cur.execute(f"""
+                SELECT
+                  COALESCE(point, 'Общее') AS point,
+                  COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) AS day_income,
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS day_expense
+                FROM "{S}".transactions
+                WHERE transaction_date = CURRENT_DATE
+                GROUP BY point ORDER BY day_income DESC
+            """)
+            stats['today_by_point'] = [dict(r) for r in cur.fetchall()]
+
+            # Итого за сегодня (все точки)
+            cur.execute(f"""
+                SELECT
+                  COALESCE(SUM(CASE WHEN type='income' THEN amount END),0) AS day_income,
+                  COALESCE(SUM(CASE WHEN type='expense' THEN amount END),0) AS day_expense
+                FROM "{S}".transactions
+                WHERE transaction_date = CURRENT_DATE
+            """)
+            stats['today_totals'] = dict(cur.fetchone())
+
             return ok(stats)
 
         # ── QUADS ──────────────────────────────────────────────
