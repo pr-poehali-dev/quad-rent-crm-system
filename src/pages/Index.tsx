@@ -1103,8 +1103,8 @@ function calcSalaries(salaryPool: number, instructors: Instructor[]) {
 
 interface BudgetRecord { id: number; point: string; date: string; daily_cash: number; amortization: number; salary: number; advertising: number; reserve: number; remainder: number; instructors_json?: string; }
 
-function PointBudgetBlock({ point, items, onSave, saving }: {
-  point: string; items: BudgetRecord[]; onSave: (point: string, date: string, cash: number, instructors: Instructor[]) => Promise<void>; saving: boolean;
+function PointBudgetBlock({ point, items, onSave, onDelete, saving }: {
+  point: string; items: BudgetRecord[]; onSave: (point: string, date: string, cash: number, instructors: Instructor[]) => Promise<void>; onDelete: (id: number) => Promise<void>; saving: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const col = POINT_COLORS[point];
@@ -1262,7 +1262,9 @@ function PointBudgetBlock({ point, items, onSave, saving }: {
                         </div>
                       )}
                     </div>
-                    <button onClick={() => r._del && r._del(r.id)} className="hidden" />
+                    <button onClick={() => onDelete(r.id)} className="text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0 mt-0.5">
+                      <Icon name="Trash2" size={15} />
+                    </button>
                   </div>
                 </div>
               );
@@ -1290,6 +1292,11 @@ function BudgetDistribution() {
     setSaving(false);
   };
 
+  const handleDelete = async (id: number) => {
+    await api.budget.remove(id);
+    await load();
+  };
+
   const fmtM = (n: number) => `₽ ${Number(n).toLocaleString("ru-RU")}`;
 
   const grandCash = items.reduce((s, r) => s + Number(r.daily_cash || 0), 0);
@@ -1308,7 +1315,7 @@ function BudgetDistribution() {
       {/* Блоки по точкам */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {POINTS.map(point => (
-          <PointBudgetBlock key={point} point={point} items={items} onSave={handleSave} saving={saving} />
+          <PointBudgetBlock key={point} point={point} items={items} onSave={handleSave} onDelete={handleDelete} saving={saving} />
         ))}
       </div>
 
