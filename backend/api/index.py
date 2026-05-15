@@ -209,20 +209,20 @@ def handler(event: dict, context) -> dict:
                 return ok([dict(r) for r in cur.fetchall()])
 
             elif method == 'POST':
+                status = body.get('status', 'pending')
                 cur.execute(f"""
                     INSERT INTO "{S}".bookings (quad_id, client_id, start_time, end_time, duration_hours, amount, deposit, status, payment_method, notes)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
                 """, (body['quad_id'], body['client_id'], body['start_time'], body['end_time'],
                       body.get('duration_hours'), body['amount'], body.get('deposit', 0),
-                      body.get('status','pending'), body.get('payment_method','cash'), body.get('notes')))
+                      status, body.get('payment_method','cash'), body.get('notes')))
                 booking = dict(cur.fetchone())
-                if body.get('status') in ('confirmed','issued'):
-                    cur.execute(f'UPDATE "{S}".quads SET status=\'rented\' WHERE id=%s', (body['quad_id'],))
-                if body.get('amount'):
+                # Автоплатёж только при статусе "тур исполнен"
+                if status == 'returned' and body.get('amount'):
                     cur.execute(f"""
                         INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date)
                         VALUES ('income', 'Аренда', %s, %s, %s, CURRENT_DATE)
-                    """, (body['amount'], f"Бронь #{booking['id']}", booking['id']))
+                    """, (body['amount'], f"Тур #{booking['id']}", booking['id']))
                 conn.commit()
                 return ok(booking)
 
@@ -243,13 +243,24 @@ def handler(event: dict, context) -> dict:
                 booking = dict(cur.fetchone())
 
                 new_status = body.get('status')
-                if quad_id:
+                if quad_id and new_status:
                     if new_status == 'returned' and old_status != 'returned':
                         cur.execute(f'UPDATE "{S}".quads SET status=\'available\' WHERE id=%s', (quad_id,))
-                    elif new_status == 'issued' and old_status != 'issued':
-                        cur.execute(f'UPDATE "{S}".quads SET status=\'rented\' WHERE id=%s', (quad_id,))
-                    elif new_status == 'cancelled' and old_status in ('confirmed','issued'):
+                    elif new_status == 'cancelled':
                         cur.execute(f'UPDATE "{S}".quads SET status=\'available\' WHERE id=%s', (quad_id,))
+
+                # Автоплатёж при переходе в "тур исполнен"
+                if new_status == 'returned' and old_status != 'returned':
+                    amount = booking.get('amount') or body.get('amount')
+                    if amount:
+                        cur.execute(f"""
+                            SELECT id FROM "{S}".transactions WHERE booking_id=%s AND type='income'
+                        """, (bid,))
+                        if not cur.fetchone():
+                            cur.execute(f"""
+                                INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date)
+                                VALUES ('income', 'Аренда', %s, %s, %s, CURRENT_DATE)
+                            """, (amount, f"Тур #{bid}", bid))
 
                 conn.commit()
                 return ok(booking)

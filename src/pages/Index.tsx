@@ -587,6 +587,7 @@ function Bookings() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
+  // status: pending = ожидание, returned = тур исполнен (оплата проводится автоматически)
 
   const load = useCallback(() => {
     setLoading(true);
@@ -610,7 +611,7 @@ function Bookings() {
   const remove = async (id: number) => { await api.bookings.remove(id); setDeleteId(null); load(); };
 
   if (loading) return <Spinner />;
-  const active = items.filter(b => ["pending", "confirmed", "issued"].includes(b.status)).length;
+  const active = items.filter(b => b.status === "pending").length;
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -652,10 +653,17 @@ function Bookings() {
             </Field>
             <Field label="Статус">
               <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                <option value="pending">Ожидание</option><option value="confirmed">Подтверждено</option><option value="issued">Выдан</option>
+                <option value="pending">Ожидание</option>
+                <option value="returned">Тур исполнен</option>
               </select>
             </Field>
           </div>
+          {form.status === "returned" && (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 text-sm text-emerald-700">
+              <Icon name="CheckCircle" size={15} className="flex-shrink-0" />
+              Оплата ₽ {Number(form.amount || 0).toLocaleString("ru-RU")} будет проведена автоматически
+            </div>
+          )}
           <Field label="Заметки"><textarea className={inputCls} rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
         </Modal>
       )}
@@ -690,10 +698,8 @@ function Bookings() {
                   <div className="text-sm font-bold text-foreground">₽ {Number(b.amount).toLocaleString()}</div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {b.status === "pending" && <button onClick={() => changeStatus(b.id, "confirmed")} className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-xl hover:bg-blue-200 font-medium">Подтвердить</button>}
-                  {b.status === "confirmed" && <button onClick={() => changeStatus(b.id, "issued")} className="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-xl hover:bg-orange-200 font-medium">Выдать</button>}
-                  {b.status === "issued" && <button onClick={() => changeStatus(b.id, "returned")} className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl hover:bg-emerald-200 font-medium">Принять</button>}
-                  {["pending", "confirmed"].includes(b.status) && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-xl hover:bg-red-200 font-medium">Отмена</button>}
+                  {b.status === "pending" && <button onClick={() => changeStatus(b.id, "returned")} className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl hover:bg-emerald-200 font-medium flex items-center gap-1"><Icon name="CheckCircle" size={12} />Тур исполнен</button>}
+                  {b.status === "pending" && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-xl hover:bg-red-200 font-medium">Отмена</button>}
                 </div>
               </div>
             ))}
@@ -725,10 +731,8 @@ function Bookings() {
                       <td className="px-5 py-4"><StatusBadge status={b.status} /></td>
                       <td className="px-5 py-4">
                         <div className="flex gap-1">
-                          {b.status === "pending" && <button onClick={() => changeStatus(b.id, "confirmed")} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 font-medium whitespace-nowrap">Подтвердить</button>}
-                          {b.status === "confirmed" && <button onClick={() => changeStatus(b.id, "issued")} className="text-[10px] bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 font-medium">Выдать</button>}
-                          {b.status === "issued" && <button onClick={() => changeStatus(b.id, "returned")} className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg hover:bg-emerald-200 font-medium">Принять</button>}
-                          {["pending", "confirmed"].includes(b.status) && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 font-medium">Отмена</button>}
+                          {b.status === "pending" && <button onClick={() => changeStatus(b.id, "returned")} className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg hover:bg-emerald-200 font-medium whitespace-nowrap">✓ Исполнен</button>}
+                          {b.status === "pending" && <button onClick={() => changeStatus(b.id, "cancelled")} className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 font-medium">Отмена</button>}
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -777,7 +781,9 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
   const remove = async (id: number) => { await api.transactions.remove(id); setDeleteId(null); load(); };
 
   const title = type === "income" ? "Доходы" : type === "expense" ? "Расходы" : "Платежи";
-  const addLabel = type === "income" ? "Внести доход" : type === "expense" ? "Внести расход" : "Добавить транзакцию";
+  const addLabel = type === "expense" ? "Внести расход" : "Добавить транзакцию";
+  // Доходы создаются автоматически при выполнении тура — ручное добавление только для расходов и вида "все"
+  const canAdd = type !== "income";
   const total = type === "income" ? data.totals?.total_income : type === "expense" ? data.totals?.total_expense : undefined;
 
   const incomeCategories = ["Аренда", "Залог", "Экскурсионный тур", "Аренда экипировки", "Прочее"];
@@ -809,9 +815,12 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-display font-semibold">{title}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{data.items?.length || 0} записей{total !== undefined ? ` · ₽ ${Number(total).toLocaleString()}` : ""}</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {data.items?.length || 0} записей{total !== undefined ? ` · ₽ ${Number(total).toLocaleString()}` : ""}
+            {type === "income" && <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Проводятся автоматически</span>}
+          </p>
         </div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">{addLabel}</span><span className="sm:hidden">Добавить</span></button>
+        {canAdd && <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">{addLabel}</span><span className="sm:hidden">Добавить</span></button>}
       </div>
 
       {isAll && (
@@ -822,7 +831,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
         </div>
       )}
 
-      {!(data.items?.length) ? <Empty icon={type === "income" ? "TrendingUp" : "TrendingDown"} text="Записей нет" action={addLabel} onAction={() => setShowModal(true)} /> : (
+      {!(data.items?.length) ? <Empty icon={type === "income" ? "TrendingUp" : "TrendingDown"} text={type === "income" ? "Доходов пока нет — они появятся после выполнения туров" : "Записей нет"} action={canAdd ? addLabel : undefined} onAction={canAdd ? () => setShowModal(true) : undefined} /> : (
         <>
           {/* Карточки на мобиле */}
           <div className="flex flex-col gap-2 sm:hidden">
