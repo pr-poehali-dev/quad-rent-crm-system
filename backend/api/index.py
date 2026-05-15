@@ -220,18 +220,19 @@ def handler(event: dict, context) -> dict:
                 # Автоплатёж только при статусе "тур исполнен"
                 if status == 'returned' and body.get('amount'):
                     cur.execute(f"""
-                        INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date)
-                        VALUES ('income', 'Аренда', %s, %s, %s, CURRENT_DATE)
-                    """, (body['amount'], f"Тур #{booking['id']}", booking['id']))
+                        INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date, point)
+                        VALUES ('income', 'Аренда', %s, %s, %s, CURRENT_DATE, %s)
+                    """, (body['amount'], f"Тур #{booking['id']}", booking['id'], body.get('point') or None))
                 conn.commit()
                 return ok(booking)
 
             elif method == 'PUT':
                 bid = params.get('id')
-                cur.execute(f'SELECT status, quad_id FROM "{S}".bookings WHERE id=%s', (bid,))
+                cur.execute(f'SELECT status, quad_id, point FROM "{S}".bookings WHERE id=%s', (bid,))
                 row = cur.fetchone()
                 old_status = row['status'] if row else None
                 quad_id = row['quad_id'] if row else None
+                booking_point = row['point'] if row else None
 
                 fields, vals = [], []
                 for f in ['status','notes','deposit','payment_method','amount']:
@@ -258,9 +259,9 @@ def handler(event: dict, context) -> dict:
                         """, (bid,))
                         if not cur.fetchone():
                             cur.execute(f"""
-                                INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date)
-                                VALUES ('income', 'Аренда', %s, %s, %s, CURRENT_DATE)
-                            """, (amount, f"Тур #{bid}", bid))
+                                INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date, point)
+                                VALUES ('income', 'Аренда', %s, %s, %s, CURRENT_DATE, %s)
+                            """, (amount, f"Тур #{bid}", bid, booking_point))
 
                 conn.commit()
                 return ok(booking)
@@ -309,10 +310,11 @@ def handler(event: dict, context) -> dict:
 
             elif method == 'POST':
                 cur.execute(f"""
-                    INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date)
-                    VALUES (%s,%s,%s,%s,%s,%s) RETURNING *
+                    INSERT INTO "{S}".transactions (type, category, amount, description, booking_id, transaction_date, point)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *
                 """, (body['type'], body['category'], body['amount'],
-                      body.get('description'), body.get('booking_id'), body.get('transaction_date', 'today')))
+                      body.get('description'), body.get('booking_id'), body.get('transaction_date', 'today'),
+                      body.get('point') or None))
                 conn.commit()
                 return ok(dict(cur.fetchone()))
 
@@ -641,6 +643,7 @@ def handler(event: dict, context) -> dict:
                         FROM "{S}".transactions t
                         WHERE t.type = 'income'
                           AND t.transaction_date <= g.deadline
+                          AND (g.point IS NULL OR t.point = g.point)
                       ), 0) AS earned
                     FROM "{S}".point_goals g
                     ORDER BY g.deadline ASC, g.id ASC

@@ -875,7 +875,7 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const isAll = type === "all";
   const defCat = type === "income" ? "Аренда" : "ТО и ремонт";
-  const [form, setForm] = useState({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10), point: "" });
 
   const load = useCallback(() => {
     setLoading(true);
@@ -887,9 +887,9 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
   const save = async () => {
     if (!form.category || !form.amount) return;
     setSaving(true);
-    await api.transactions.create({ ...form, amount: Number(form.amount) });
+    await api.transactions.create({ ...form, amount: Number(form.amount), point: form.point || null });
     setSaving(false); setShowModal(false);
-    setForm({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10) });
+    setForm({ type: type === "all" ? "income" : type, category: defCat, amount: "", description: "", transaction_date: new Date().toISOString().slice(0, 10), point: "" });
     load();
   };
   const remove = async (id: number) => { await api.transactions.remove(id); setDeleteId(null); load(); };
@@ -920,8 +920,18 @@ function TransactionSection({ type }: { type: "income" | "expense" | "all" }) {
             </select>
           </Field>
           <Field label="Сумма (₽) *"><input className={inputCls} type="number" min="0" placeholder="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Точка">
+              <select className={selectCls} value={form.point} onChange={e => setForm({ ...form, point: e.target.value })}>
+                <option value="">— Все точки —</option>
+                <option value="Находка">Находка</option>
+                <option value="Волчанец">Волчанец</option>
+                <option value="Другая">Другая</option>
+              </select>
+            </Field>
+            <Field label="Дата"><input className={inputCls} type="date" value={form.transaction_date} onChange={e => setForm({ ...form, transaction_date: e.target.value })} /></Field>
+          </div>
           <Field label="Описание"><textarea className={inputCls} rows={2} placeholder="Подробности..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></Field>
-          <Field label="Дата"><input className={inputCls} type="date" value={form.transaction_date} onChange={e => setForm({ ...form, transaction_date: e.target.value })} /></Field>
         </Modal>
       )}
       {deleteId !== null && <ConfirmDelete text="Запись будет удалена" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
