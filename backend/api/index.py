@@ -541,7 +541,7 @@ def handler(event: dict, context) -> dict:
             if method == 'GET':
                 cur.execute(f"""
                     SELECT id, point, date, daily_cash, amortization, salary,
-                           advertising, reserve, remainder, created_at
+                           advertising, reserve, remainder, instructors_json, created_at
                     FROM "{S}".budget_distributions
                     ORDER BY date DESC, id DESC
                     LIMIT 200
@@ -552,6 +552,7 @@ def handler(event: dict, context) -> dict:
                 cash = float(body.get('daily_cash', 0))
                 point = body.get('point', '')
                 date = body.get('date', '')
+                instructors_json = body.get('instructors_json', '[]')
                 amort = round(cash * 0.10, 2)
                 salary = round(cash * 0.15, 2)
                 adv = round(cash * 0.10, 2)
@@ -559,10 +560,10 @@ def handler(event: dict, context) -> dict:
                 remainder = round(cash * 0.50, 2)
                 cur.execute(f"""
                     INSERT INTO "{S}".budget_distributions
-                      (point, date, daily_cash, amortization, salary, advertising, reserve, remainder)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                      (point, date, daily_cash, amortization, salary, advertising, reserve, remainder, instructors_json)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                """, (point, date, cash, amort, salary, adv, reserve, remainder))
+                """, (point, date, cash, amort, salary, adv, reserve, remainder, instructors_json))
                 new_id = cur.fetchone()['id']
                 conn.commit()
                 return ok({'id': new_id})

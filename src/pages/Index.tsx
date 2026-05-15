@@ -1088,99 +1088,231 @@ const POINT_COLORS: Record<string, { border: string; text: string; accent: strin
   "Находка":  { border: "border-blue-200",    text: "text-blue-700",    accent: "#60a5fa" },
 };
 
-function BudgetDistribution() {
+type InstructorRole = "senior" | "regular";
+interface Instructor { name: string; role: InstructorRole; }
+
+function calcSalaries(salaryPool: number, instructors: Instructor[]) {
+  if (!instructors.length) return [];
+  const totalCoef = instructors.reduce((s, i) => s + (i.role === "senior" ? 1.25 : 1.0), 0);
+  const unit = totalCoef > 0 ? salaryPool / totalCoef : 0;
+  return instructors.map(i => ({
+    ...i,
+    amount: Math.round(unit * (i.role === "senior" ? 1.25 : 1.0)),
+  }));
+}
+
+interface BudgetRecord { id: number; point: string; date: string; daily_cash: number; amortization: number; salary: number; advertising: number; reserve: number; remainder: number; instructors_json?: string; }
+
+function PointBudgetBlock({ point, items, onSave, saving }: {
+  point: string; items: BudgetRecord[]; onSave: (point: string, date: string, cash: number, instructors: Instructor[]) => Promise<void>; saving: boolean;
+}) {
   const today = new Date().toISOString().slice(0, 10);
-  const [items, setItems] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
-  const [cash, setCash] = useState<Record<string, string>>({ "Волчанец": "", "Находка": "" });
+  const col = POINT_COLORS[point];
+  const [cashStr, setCashStr] = useState("");
   const [date, setDate] = useState(today);
+  const [instructors, setInstructors] = useState<Instructor[]>([{ name: "", role: "regular" }]);
+
+  const preview = parseFloat(cashStr) || 0;
+  const salaryPool = Math.round(preview * 0.15);
+  const previewSalaries = calcSalaries(salaryPool, instructors.filter(i => i.name.trim()));
+
+  const addInstructor = () => setInstructors(prev => [...prev, { name: "", role: "regular" }]);
+  const removeInstructor = (idx: number) => setInstructors(prev => prev.filter((_, i) => i !== idx));
+  const updateInstructor = (idx: number, field: keyof Instructor, val: string) =>
+    setInstructors(prev => prev.map((ins, i) => i === idx ? { ...ins, [field]: val } : ins));
+
+  const handleSave = async () => {
+    if (!preview) return;
+    await onSave(point, date, preview, instructors.filter(i => i.name.trim()));
+    setCashStr("");
+    setInstructors([{ name: "", role: "regular" }]);
+  };
+
+  const fmtM = (n: number) => `₽ ${Number(n).toLocaleString("ru-RU")}`;
+
+  const pointItems = items.filter(r => r.point === point);
+  const pointCash = pointItems.reduce((s, r) => s + Number(r.daily_cash || 0), 0);
+  const pointSalary = pointItems.reduce((s, r) => s + Number(r.salary || 0), 0);
+
+  return (
+    <div className={`bg-card rounded-2xl border ${col.border} p-5 space-y-5`}>
+      {/* Заголовок + итог точки */}
+      <div className="flex items-center justify-between">
+        <span className={`font-bold text-base ${col.text}`}>{point}</span>
+        {pointCash > 0 && (
+          <div className="flex gap-3 text-xs text-muted-foreground">
+            <span>Касса: <span className="font-semibold text-foreground">{fmtM(pointCash)}</span></span>
+            <span>ФОТ: <span className="font-semibold text-foreground">{fmtM(pointSalary)}</span></span>
+          </div>
+        )}
+      </div>
+
+      {/* Ввод кассы и даты */}
+      <div className="flex gap-2 flex-wrap">
+        <input type="date" className={inputCls + " w-36 flex-shrink-0"} value={date} onChange={e => setDate(e.target.value)} />
+        <input className={inputCls + " flex-1 min-w-32"} type="number" placeholder="Дневная касса, ₽" value={cashStr} onChange={e => setCashStr(e.target.value)} />
+      </div>
+
+      {/* Инструкторы */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Инструкторы</span>
+          <button onClick={addInstructor} className="text-xs text-primary hover:underline flex items-center gap-1">
+            <Icon name="Plus" size={13} /> Добавить
+          </button>
+        </div>
+        {instructors.map((ins, idx) => (
+          <div key={idx} className="flex gap-2 items-center">
+            <input
+              className={inputCls + " flex-1"}
+              placeholder="Имя инструктора"
+              value={ins.name}
+              onChange={e => updateInstructor(idx, "name", e.target.value)}
+            />
+            <select
+              className={selectCls + " w-44 flex-shrink-0"}
+              value={ins.role}
+              onChange={e => updateInstructor(idx, "role", e.target.value as InstructorRole)}
+            >
+              <option value="regular">Инструктор ×1.0</option>
+              <option value="senior">Старший ×1.25</option>
+            </select>
+            {instructors.length > 1 && (
+              <button onClick={() => removeInstructor(idx)} className="text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0">
+                <Icon name="X" size={15} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Превью расчёта */}
+      {preview > 0 && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {BUDGET_CRITERIA.map(c => (
+              <div key={c.key} className="bg-muted/50 rounded-xl p-2.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                  <span className="text-xs text-muted-foreground">{c.label} {c.pct}%</span>
+                </div>
+                <div className="font-semibold text-sm">{fmtM(Math.round(preview * c.pct / 100))}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Зарплаты инструкторов */}
+          {previewSalaries.length > 0 && (
+            <div className={`rounded-xl p-3 space-y-1.5 ${col.border} border bg-muted/30`}>
+              <div className="text-xs font-medium text-muted-foreground mb-2">Зарплатный фонд: {fmtM(salaryPool)} → распределение</div>
+              {previewSalaries.map((ins, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{ins.name}</span>
+                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                      {ins.role === "senior" ? "Старший ×1.25" : "Инструктор ×1.0"}
+                    </span>
+                  </div>
+                  <span className="font-semibold text-sm">{fmtM(ins.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        disabled={saving || !cashStr}
+        onClick={handleSave}
+        className="w-full py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+      >
+        Сохранить запись
+      </button>
+
+      {/* История по этой точке */}
+      {pointItems.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">История</div>
+          <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+            {pointItems.map((r: BudgetRecord) => {
+              const salaries: { name: string; role: InstructorRole; amount: number }[] = r.instructors_json ? JSON.parse(r.instructors_json) : [];
+              return (
+                <div key={r.id} className="px-4 py-3 bg-card hover:bg-muted/20 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">{new Date(r.date).toLocaleDateString("ru-RU")}</span>
+                        <span className="text-xs font-semibold bg-muted px-2 py-0.5 rounded-full">Касса: {fmtM(Number(r.daily_cash))}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                        {BUDGET_CRITERIA.map(c => (
+                          <span key={c.key} className="text-xs text-muted-foreground">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ background: c.color, verticalAlign: "middle" }} />
+                            {c.label}: {fmtM(Number(r[c.key]))}
+                          </span>
+                        ))}
+                      </div>
+                      {salaries.length > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-0.5">
+                          {salaries.map((ins, i) => (
+                            <span key={i} className="text-xs text-muted-foreground">
+                              👤 {ins.name} ({ins.role === "senior" ? "ст." : "инстр."}): <span className="font-medium text-foreground">{fmtM(ins.amount)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => r._del && r._del(r.id)} className="hidden" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BudgetDistribution() {
+  const [items, setItems] = useState<BudgetRecord[]>([]);
   const [saving, setSaving] = useState(false);
 
   const load = () => api.budget.list().then(d => setItems(d.items || []));
   useEffect(() => { load(); }, []);
 
-  const handleSave = async (point: string) => {
-    const val = parseFloat(cash[point]);
-    if (!val || val <= 0) return;
+  const handleSave = async (point: string, date: string, cash: number, instructors: Instructor[]) => {
     setSaving(true);
-    await api.budget.create({ point, date, daily_cash: val });
-    setCash(prev => ({ ...prev, [point]: "" }));
+    const salaryPool = Math.round(cash * 0.15);
+    const salaries = calcSalaries(salaryPool, instructors);
+    await api.budget.create({ point, date, daily_cash: cash, instructors_json: JSON.stringify(salaries) });
     await load();
     setSaving(false);
   };
 
-  const handleDelete = async (id: number) => {
-    await api.budget.remove(id);
-    await load();
-  };
-
   const fmtM = (n: number) => `₽ ${Number(n).toLocaleString("ru-RU")}`;
 
-  // Сводка по всем записям
+  const grandCash = items.reduce((s, r) => s + Number(r.daily_cash || 0), 0);
   const totals = BUDGET_CRITERIA.reduce((acc, c) => {
     acc[c.key] = items.reduce((s, r) => s + Number(r[c.key] || 0), 0);
     return acc;
   }, {} as Record<string, number>);
-  const grandCash = items.reduce((s, r) => s + Number(r.daily_cash || 0), 0);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Распределение бюджета</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Введи дневную кассу — деньги распределятся автоматически</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Введи дневную кассу и инструкторов — зарплата посчитается по коэффициентам</p>
       </div>
 
-      {/* Ввод кассы */}
+      {/* Блоки по точкам */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {POINTS.map(point => {
-          const col = POINT_COLORS[point];
-          const preview = parseFloat(cash[point]) || 0;
-          return (
-            <div key={point} className={`bg-card rounded-2xl border ${col.border} p-5 space-y-4`}>
-              <div className={`font-semibold text-base ${col.text}`}>{point}</div>
-
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  className={inputCls + " w-36"}
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                />
-                <input
-                  className={inputCls + " flex-1"}
-                  type="number"
-                  placeholder="Дневная касса, ₽"
-                  value={cash[point]}
-                  onChange={e => setCash(prev => ({ ...prev, [point]: e.target.value }))}
-                />
-                <button
-                  disabled={saving || !cash[point]}
-                  onClick={() => handleSave(point)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 whitespace-nowrap"
-                >
-                  Добавить
-                </button>
-              </div>
-
-              {/* Превью расчёта */}
-              {preview > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {BUDGET_CRITERIA.map(c => (
-                    <div key={c.key} className="bg-muted/50 rounded-xl p-2.5">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
-                        <span className="text-xs text-muted-foreground">{c.label} {c.pct}%</span>
-                      </div>
-                      <div className="font-semibold text-sm">{fmtM(Math.round(preview * c.pct / 100))}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {POINTS.map(point => (
+          <PointBudgetBlock key={point} point={point} items={items} onSave={handleSave} saving={saving} />
+        ))}
       </div>
 
-      {/* Сводная таблица */}
+      {/* Итого по всем точкам */}
       {grandCash > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
           <h3 className="font-semibold">Итого по всем точкам</h3>
@@ -1198,45 +1330,6 @@ function BudgetDistribution() {
                 <div className="font-semibold">{fmtM(Math.round(totals[c.key]))}</div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* История записей */}
-      {items.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-5 py-4 border-b border-border font-semibold text-sm">История распределений</div>
-          <div className="divide-y divide-border">
-            {items.map((r: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-              const col = POINT_COLORS[r.point] || { border: "border-border", text: "text-foreground", accent: "#94a3b8" };
-              return (
-                <div key={r.id} className="px-5 py-3 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`text-sm font-semibold ${col.text}`}>{r.point}</span>
-                        <span className="text-xs text-muted-foreground">{new Date(r.date).toLocaleDateString("ru-RU")}</span>
-                        <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-full">Касса: {fmtM(Number(r.daily_cash))}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {BUDGET_CRITERIA.map(c => (
-                          <span key={c.key} className="text-xs text-muted-foreground">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ background: c.color, verticalAlign: "middle" }} />
-                            {c.label}: {fmtM(Number(r[c.key]))}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDelete(r.id)}
-                      className="text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
-                    >
-                      <Icon name="Trash2" size={15} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       )}
