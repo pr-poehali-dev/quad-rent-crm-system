@@ -82,4 +82,10 @@ export const api = {
   },
 
   reports: () => request('reports'),
+
+  budget: {
+    list: () => request('budget'),
+    create: (data: object) => request('budget', 'POST', data),
+    remove: (id: number) => request('budget', 'DELETE', { id }),
+  },
 };

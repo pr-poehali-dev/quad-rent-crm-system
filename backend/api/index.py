@@ -536,6 +536,43 @@ def handler(event: dict, context) -> dict:
                 'point_monthly': point_monthly,
             })
 
+        # ── BUDGET DISTRIBUTION ────────────────────────────────────
+        if resource == 'budget':
+            if method == 'GET':
+                cur.execute(f"""
+                    SELECT id, point, date, daily_cash, amortization, salary,
+                           advertising, reserve, remainder, created_at
+                    FROM "{S}".budget_distributions
+                    ORDER BY date DESC, id DESC
+                    LIMIT 200
+                """)
+                return ok({'items': [dict(r) for r in cur.fetchall()]})
+
+            if method == 'POST':
+                cash = float(body.get('daily_cash', 0))
+                point = body.get('point', '')
+                date = body.get('date', '')
+                amort = round(cash * 0.10, 2)
+                salary = round(cash * 0.15, 2)
+                adv = round(cash * 0.10, 2)
+                reserve = round(cash * 0.15, 2)
+                remainder = round(cash * 0.50, 2)
+                cur.execute(f"""
+                    INSERT INTO "{S}".budget_distributions
+                      (point, date, daily_cash, amortization, salary, advertising, reserve, remainder)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (point, date, cash, amort, salary, adv, reserve, remainder))
+                new_id = cur.fetchone()['id']
+                conn.commit()
+                return ok({'id': new_id})
+
+            if method == 'DELETE':
+                row_id = body.get('id')
+                cur.execute(f'DELETE FROM "{S}".budget_distributions WHERE id = %s', (row_id,))
+                conn.commit()
+                return ok({'deleted': row_id})
+
         return err('Unknown resource')
 
     except Exception as e:

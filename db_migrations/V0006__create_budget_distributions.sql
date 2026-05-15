@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS t_p21303888_quad_rent_crm_system.budget_distributions (
+  id SERIAL PRIMARY KEY,
+  point VARCHAR(100) NOT NULL,
+  date DATE NOT NULL,
+  daily_cash NUMERIC(12,2) NOT NULL DEFAULT 0,
+  amortization NUMERIC(12,2) NOT NULL DEFAULT 0,
+  salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+  advertising NUMERIC(12,2) NOT NULL DEFAULT 0,
+  reserve NUMERIC(12,2) NOT NULL DEFAULT 0,
+  remainder NUMERIC(12,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

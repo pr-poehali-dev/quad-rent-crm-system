@@ -1062,6 +1062,191 @@ function Reports() {
           </div>
         )}
       </div>
+
+      {/* Распределение бюджета */}
+      <div className="bg-card rounded-2xl border border-border p-6">
+        <BudgetDistribution />
+      </div>
+    </div>
+  );
+}
+
+// ── РАСПРЕДЕЛЕНИЕ БЮДЖЕТА ──────────────────────────────────────
+
+const BUDGET_CRITERIA = [
+  { key: "amortization", label: "Амортизация", pct: 10, color: "#f87171" },
+  { key: "salary",       label: "Зарплата",    pct: 15, color: "#fb923c" },
+  { key: "advertising",  label: "Реклама",     pct: 10, color: "#fbbf24" },
+  { key: "reserve",      label: "Резерв",      pct: 15, color: "#a78bfa" },
+  { key: "remainder",    label: "Остаток",     pct: 50, color: "#34d399" },
+];
+
+const POINTS = ["Волчанец", "Находка"];
+
+const POINT_COLORS: Record<string, { border: string; text: string; accent: string }> = {
+  "Волчанец": { border: "border-emerald-200", text: "text-emerald-700", accent: "#34d399" },
+  "Находка":  { border: "border-blue-200",    text: "text-blue-700",    accent: "#60a5fa" },
+};
+
+function BudgetDistribution() {
+  const today = new Date().toISOString().slice(0, 10);
+  const [items, setItems] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [cash, setCash] = useState<Record<string, string>>({ "Волчанец": "", "Находка": "" });
+  const [date, setDate] = useState(today);
+  const [saving, setSaving] = useState(false);
+
+  const load = () => api.budget.list().then(d => setItems(d.items || []));
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async (point: string) => {
+    const val = parseFloat(cash[point]);
+    if (!val || val <= 0) return;
+    setSaving(true);
+    await api.budget.create({ point, date, daily_cash: val });
+    setCash(prev => ({ ...prev, [point]: "" }));
+    await load();
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: number) => {
+    await api.budget.remove(id);
+    await load();
+  };
+
+  const fmtM = (n: number) => `₽ ${Number(n).toLocaleString("ru-RU")}`;
+
+  // Сводка по всем записям
+  const totals = BUDGET_CRITERIA.reduce((acc, c) => {
+    acc[c.key] = items.reduce((s, r) => s + Number(r[c.key] || 0), 0);
+    return acc;
+  }, {} as Record<string, number>);
+  const grandCash = items.reduce((s, r) => s + Number(r.daily_cash || 0), 0);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">Распределение бюджета</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">Введи дневную кассу — деньги распределятся автоматически</p>
+      </div>
+
+      {/* Ввод кассы */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {POINTS.map(point => {
+          const col = POINT_COLORS[point];
+          const preview = parseFloat(cash[point]) || 0;
+          return (
+            <div key={point} className={`bg-card rounded-2xl border ${col.border} p-5 space-y-4`}>
+              <div className={`font-semibold text-base ${col.text}`}>{point}</div>
+
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  className={inputCls + " w-36"}
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                />
+                <input
+                  className={inputCls + " flex-1"}
+                  type="number"
+                  placeholder="Дневная касса, ₽"
+                  value={cash[point]}
+                  onChange={e => setCash(prev => ({ ...prev, [point]: e.target.value }))}
+                />
+                <button
+                  disabled={saving || !cash[point]}
+                  onClick={() => handleSave(point)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 whitespace-nowrap"
+                >
+                  Добавить
+                </button>
+              </div>
+
+              {/* Превью расчёта */}
+              {preview > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {BUDGET_CRITERIA.map(c => (
+                    <div key={c.key} className="bg-muted/50 rounded-xl p-2.5">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                        <span className="text-xs text-muted-foreground">{c.label} {c.pct}%</span>
+                      </div>
+                      <div className="font-semibold text-sm">{fmtM(Math.round(preview * c.pct / 100))}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Сводная таблица */}
+      {grandCash > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+          <h3 className="font-semibold">Итого по всем точкам</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="bg-muted/40 rounded-xl p-3 col-span-2 sm:col-span-1">
+              <div className="text-xs text-muted-foreground mb-0.5">Общая касса</div>
+              <div className="font-semibold">{fmtM(grandCash)}</div>
+            </div>
+            {BUDGET_CRITERIA.map(c => (
+              <div key={c.key} className="bg-muted/40 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                  <span className="text-xs text-muted-foreground">{c.label}</span>
+                </div>
+                <div className="font-semibold">{fmtM(Math.round(totals[c.key]))}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* История записей */}
+      {items.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
+          <div className="px-5 py-4 border-b border-border font-semibold text-sm">История распределений</div>
+          <div className="divide-y divide-border">
+            {items.map((r: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+              const col = POINT_COLORS[r.point] || { border: "border-border", text: "text-foreground", accent: "#94a3b8" };
+              return (
+                <div key={r.id} className="px-5 py-3 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-sm font-semibold ${col.text}`}>{r.point}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(r.date).toLocaleDateString("ru-RU")}</span>
+                        <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-full">Касса: {fmtM(Number(r.daily_cash))}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {BUDGET_CRITERIA.map(c => (
+                          <span key={c.key} className="text-xs text-muted-foreground">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ background: c.color, verticalAlign: "middle" }} />
+                            {c.label}: {fmtM(Number(r[c.key]))}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      className="text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
+                    >
+                      <Icon name="Trash2" size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!items.length && (
+        <div className="bg-card rounded-2xl border border-border p-10 text-center">
+          <Icon name="PieChart" size={36} className="text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Введи дневную кассу выше — появится первая запись</p>
+        </div>
+      )}
     </div>
   );
 }
