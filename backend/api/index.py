@@ -574,6 +574,52 @@ def handler(event: dict, context) -> dict:
                 conn.commit()
                 return ok({'deleted': row_id})
 
+        # ── CERTIFICATES ───────────────────────────────────────
+        if resource == 'certificates':
+            if method == 'GET':
+                cur.execute(f'SELECT * FROM "{S}".certificates ORDER BY paid_date DESC, id DESC')
+                rows = []
+                for r in cur.fetchall():
+                    d = dict(r)
+                    d['paid_date'] = str(d['paid_date'])
+                    rows.append(d)
+                return ok(rows)
+
+            if method == 'POST':
+                cur.execute(f"""
+                    INSERT INTO "{S}".certificates (client_name, phone, telegram, passport, notes, paid_date, status, amount)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
+                """, (body['client_name'], noneify(body.get('phone')), noneify(body.get('telegram')),
+                      noneify(body.get('passport')), noneify(body.get('notes')),
+                      body['paid_date'], body.get('status', 'pending'),
+                      float(body.get('amount', 0) or 0)))
+                conn.commit()
+                row = dict(cur.fetchone())
+                row['paid_date'] = str(row['paid_date'])
+                return ok(row)
+
+            if method == 'PUT':
+                cid = params.get('id')
+                cur.execute(f"""
+                    UPDATE "{S}".certificates
+                    SET client_name=%s, phone=%s, telegram=%s, passport=%s, notes=%s,
+                        paid_date=%s, status=%s, amount=%s
+                    WHERE id=%s RETURNING *
+                """, (body['client_name'], noneify(body.get('phone')), noneify(body.get('telegram')),
+                      noneify(body.get('passport')), noneify(body.get('notes')),
+                      body['paid_date'], body.get('status', 'pending'),
+                      float(body.get('amount', 0) or 0), cid))
+                conn.commit()
+                row = dict(cur.fetchone())
+                row['paid_date'] = str(row['paid_date'])
+                return ok(row)
+
+            if method == 'DELETE':
+                cid = params.get('id')
+                cur.execute(f'DELETE FROM "{S}".certificates WHERE id=%s', (cid,))
+                conn.commit()
+                return ok({'deleted': True})
+
         return err('Unknown resource')
 
     except Exception as e:

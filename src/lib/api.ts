@@ -88,4 +88,11 @@ export const api = {
     create: (data: object) => request('budget', 'POST', data),
     remove: (id: number) => request('budget', 'DELETE', { id }),
   },
+
+  certificates: {
+    list: () => request('certificates'),
+    create: (data: object) => request('certificates', 'POST', data),
+    update: (id: number, data: object) => request('certificates', 'PUT', data, { id: String(id) }),
+    remove: (id: number) => request('certificates', 'DELETE', undefined, { id: String(id) }),
+  },
 };

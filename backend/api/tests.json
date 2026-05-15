@@ -64,6 +64,13 @@
       "bodyMatcher": "partial"
     },
     {
+      "name": "Get certificates",
+      "method": "GET",
+      "path": "/?resource=certificates",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
       "name": "Create quad with empty optional fields",
       "method": "POST",
       "path": "/?resource=quads",

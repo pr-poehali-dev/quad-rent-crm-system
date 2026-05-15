@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/api";
 type Section =
   | "dashboard" | "clients" | "bookings" | "quads"
   | "payments" | "reports" | "expenses" | "income"
-  | "calendar" | "employees" | "contacts";
+  | "calendar" | "employees" | "contacts" | "certificates";
 
 const navItems: { id: Section; label: string; icon: string }[] = [
   { id: "dashboard", label: "Дашборд", icon: "LayoutDashboard" },
@@ -18,6 +18,7 @@ const navItems: { id: Section; label: string; icon: string }[] = [
   { id: "expenses", label: "Расходы", icon: "TrendingDown" },
   { id: "reports", label: "Отчёты", icon: "BarChart3" },
   { id: "employees", label: "Сотрудники", icon: "UserCog" },
+  { id: "certificates", label: "Сертификаты", icon: "Award" },
   { id: "contacts", label: "Контакты", icon: "Phone" },
 ];
 
@@ -298,9 +299,14 @@ function Clients() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editItem, setEditItem] = useState<any | null>(null);
   const [form, setForm] = useState(emptyClientForm);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(() => { setLoading(true); api.clients.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false)); }, []);
   useEffect(() => { load(); }, [load]);
+
+  const filtered = search.trim()
+    ? items.filter(c => (c.phone || "").replace(/\D/g, "").includes(search.replace(/\D/g, "")) || (c.full_name || "").toLowerCase().includes(search.toLowerCase()))
+    : items;
 
   const openAdd = () => { setEditItem(null); setForm(emptyClientForm); setShowModal(true); };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -350,11 +356,25 @@ function Clients() {
         <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap"><Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить клиента</span><span className="sm:hidden">Добавить</span></button>
       </div>
 
-      {!items.length ? <Empty icon="Users" text="Клиентов пока нет" action="Добавить клиента" onAction={openAdd} /> : (
+      <div className="flex items-center gap-2 bg-muted rounded-xl px-4 py-2.5">
+        <Icon name="Search" size={16} className="text-muted-foreground flex-shrink-0" />
+        <input
+          type="text"
+          placeholder="Поиск по имени или телефону..."
+          className="bg-transparent text-sm outline-none flex-1 text-foreground placeholder:text-muted-foreground"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && <button onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground"><Icon name="X" size={14} /></button>}
+      </div>
+
+      {!items.length ? <Empty icon="Users" text="Клиентов пока нет" action="Добавить клиента" onAction={openAdd} /> : filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Ничего не найдено по запросу «{search}»</div>
+      ) : (
         <>
           {/* Карточки на мобиле */}
           <div className="flex flex-col gap-3 sm:hidden">
-            {items.map(c => {
+            {filtered.map(c => {
               const initials = c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
               const status = c.is_blacklisted ? "blacklisted" : Number(c.trips_count) > 5 ? "vip" : Number(c.trips_count) === 0 ? "new" : "active";
               return (
@@ -397,7 +417,7 @@ function Clients() {
                 <th className="text-left text-xs text-muted-foreground font-medium px-6 py-4"></th>
               </tr></thead>
               <tbody>
-                {items.map(c => (
+                {filtered.map(c => (
                   <tr key={c.id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${c.is_blacklisted ? "bg-red-50/50" : ""}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -1594,6 +1614,145 @@ function Contacts() {
   );
 }
 
+// ── СЕРТИФИКАТЫ ───────────────────────────────────────────────
+
+const emptyCertForm = { client_name: "", phone: "", telegram: "", passport: "", notes: "", paid_date: new Date().toISOString().slice(0, 10), status: "pending", amount: "" };
+
+function Certificates() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [form, setForm] = useState(emptyCertForm);
+  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "completed">("all");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api.certificates.list().then(d => { setItems(d); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const openAdd = () => { setEditItem(null); setForm({ ...emptyCertForm, paid_date: new Date().toISOString().slice(0, 10) }); setShowModal(true); };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const openEdit = (c: any) => {
+    setEditItem(c);
+    setForm({ client_name: c.client_name || "", phone: c.phone || "", telegram: c.telegram || "", passport: c.passport || "", notes: c.notes || "", paid_date: c.paid_date || "", status: c.status || "pending", amount: String(c.amount || "") });
+    setShowModal(true);
+  };
+
+  const save = async () => {
+    if (!form.client_name.trim()) return;
+    setSaving(true);
+    const data = { ...form, amount: parseFloat(form.amount) || 0 };
+    if (editItem) {
+      await api.certificates.update(editItem.id, data);
+    } else {
+      await api.certificates.create(data);
+    }
+    setSaving(false); setShowModal(false); setEditItem(null); load();
+  };
+
+  const remove = async (id: number) => { await api.certificates.remove(id); setDeleteId(null); load(); };
+
+  const fmtDate = (s: string) => { try { return new Date(s).toLocaleDateString("ru-RU"); } catch { return s; } };
+  const fmtMoney = (n: number) => `₽ ${Number(n).toLocaleString("ru-RU")}`;
+
+  const filtered = filterStatus === "all" ? items : items.filter(c => c.status === filterStatus);
+  const countPending = items.filter(c => c.status === "pending").length;
+  const countDone = items.filter(c => c.status === "completed").length;
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="animate-fade-in space-y-6">
+      {showModal && (
+        <Modal title={editItem ? "Редактировать сертификат" : "Новый сертификат"} onClose={() => { setShowModal(false); setEditItem(null); }} onSubmit={save} loading={saving}>
+          <Field label="Имя клиента *"><input className={inputCls} placeholder="Алексей Морозов" value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} /></Field>
+          <Field label="Телефон"><input className={inputCls} placeholder="+7 900 000-00-00" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
+          <Field label="Telegram"><input className={inputCls} placeholder="@username" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} /></Field>
+          <Field label="Паспорт / документ"><input className={inputCls} placeholder="4520 123456" value={form.passport} onChange={e => setForm({ ...form, passport: e.target.value })} /></Field>
+          <Field label="Дата оплаты"><input className={inputCls} type="date" value={form.paid_date} onChange={e => setForm({ ...form, paid_date: e.target.value })} /></Field>
+          <Field label="Сумма сертификата, ₽"><input className={inputCls} type="number" placeholder="5000" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></Field>
+          <Field label="Статус">
+            <select className={selectCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+              <option value="pending">Ожидание</option>
+              <option value="completed">Выполнен</option>
+            </select>
+          </Field>
+          <Field label="Заметки"><textarea className={inputCls} rows={2} placeholder="Доп. информация..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
+        </Modal>
+      )}
+      {deleteId !== null && <ConfirmDelete text="Сертификат будет удалён" onConfirm={() => remove(deleteId)} onCancel={() => setDeleteId(null)} />}
+
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-display font-semibold">Сертификаты</h1>
+          <p className="text-muted-foreground text-sm mt-1">{items.length} сертификатов · ожидание: {countPending} · выполнено: {countDone}</p>
+        </div>
+        <button onClick={openAdd} className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+          <Icon name="Plus" size={16} /><span className="hidden sm:inline">Добавить</span><span className="sm:hidden">+</span>
+        </button>
+      </div>
+
+      {/* Фильтр */}
+      <div className="flex gap-2">
+        {(["all", "pending", "completed"] as const).map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterStatus === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+            {s === "all" ? "Все" : s === "pending" ? "Ожидание" : "Выполнены"}
+          </button>
+        ))}
+      </div>
+
+      {!filtered.length ? (
+        <Empty icon="Award" text="Сертификатов пока нет" action="Добавить сертификат" onAction={openAdd} />
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(c => (
+            <div key={c.id} className="bg-card rounded-2xl border border-border p-5 flex items-center gap-4 hover:border-primary/40 transition-colors">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${c.status === "completed" ? "bg-emerald-100" : "bg-amber-100"}`}>
+                <Icon name="Award" size={20} className={c.status === "completed" ? "text-emerald-600" : "text-amber-600"} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-semibold text-foreground">{c.client_name}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {c.status === "completed" ? "Выполнен" : "Ожидание"}
+                  </span>
+                </div>
+                <div className="flex gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
+                  {c.phone && <span>{c.phone}</span>}
+                  {c.telegram && <span>{c.telegram}</span>}
+                  <span>Оплата: {fmtDate(c.paid_date)}</span>
+                  {Number(c.amount) > 0 && <span className="font-semibold text-foreground">{fmtMoney(Number(c.amount))}</span>}
+                </div>
+                {c.notes && <div className="text-xs text-muted-foreground mt-1 italic">{c.notes}</div>}
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                {c.status === "pending" && (
+                  <button
+                    onClick={async () => { await api.certificates.update(c.id, { ...c, status: "completed" }); load(); }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                    title="Отметить выполненным"
+                  >
+                    <Icon name="Check" size={15} />
+                  </button>
+                )}
+                <button onClick={() => openEdit(c)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"><Icon name="Pencil" size={14} /></button>
+                <button onClick={() => setDeleteId(c.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"><Icon name="Trash2" size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── ГЛАВНЫЙ КОМПОНЕНТ ─────────────────────────────────────────
 
 export default function Index() {
@@ -1611,6 +1770,7 @@ export default function Index() {
     expenses: <TransactionSection type="expense" />,
     reports: <Reports />,
     employees: <Employees />,
+    certificates: <Certificates />,
     contacts: <Contacts />,
   };
 
