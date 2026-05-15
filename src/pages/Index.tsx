@@ -588,6 +588,9 @@ function Bookings() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
   // status: pending = ожидание, returned = тур исполнен (оплата проводится автоматически)
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientDropOpen, setClientDropOpen] = useState(false);
+  const clientSearchRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -606,6 +609,7 @@ function Bookings() {
     await api.bookings.create({ ...form, quad_id: Number(form.quad_id), client_id: Number(form.client_id), start_time: start.toISOString(), end_time: end.toISOString(), duration_hours: hrs, amount: Number(form.amount), deposit: Number(form.deposit) });
     setSaving(false); setShowModal(false);
     setForm({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
+    setClientSearch(""); setClientDropOpen(false);
     load();
   };
   const remove = async (id: number) => { await api.bookings.remove(id); setDeleteId(null); load(); };
@@ -624,10 +628,58 @@ function Bookings() {
             </select>
           </Field>
           <Field label="Клиент *">
-            <select className={selectCls} value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}>
-              <option value="">— Выберите клиента —</option>
-              {clientsList.map(c => <option key={c.id} value={c.id}>{c.full_name} {c.phone ? `(${c.phone})` : ""}</option>)}
-            </select>
+            <div className="relative" ref={clientSearchRef}>
+              <div className={`flex items-center gap-2 ${inputCls} cursor-text`} onClick={() => setClientDropOpen(true)}>
+                <Icon name="Search" size={14} className="text-muted-foreground flex-shrink-0" />
+                {form.client_id && !clientDropOpen ? (
+                  <span className="flex-1 text-sm truncate">
+                    {clientsList.find(c => String(c.id) === form.client_id)?.full_name || ""}
+                    {clientsList.find(c => String(c.id) === form.client_id)?.phone ? ` · ${clientsList.find(c => String(c.id) === form.client_id)?.phone}` : ""}
+                  </span>
+                ) : (
+                  <input
+                    autoFocus={clientDropOpen}
+                    className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+                    placeholder="Поиск по имени или телефону..."
+                    value={clientSearch}
+                    onChange={e => { setClientSearch(e.target.value); setClientDropOpen(true); }}
+                    onFocus={() => setClientDropOpen(true)}
+                  />
+                )}
+                {form.client_id && <button type="button" onClick={e => { e.stopPropagation(); setForm({ ...form, client_id: "" }); setClientSearch(""); }} className="text-muted-foreground hover:text-foreground flex-shrink-0"><Icon name="X" size={13} /></button>}
+              </div>
+              {clientDropOpen && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {clientsList
+                    .filter(c => !clientSearch.trim() ||
+                      c.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                      (c.phone || "").replace(/\D/g, "").includes(clientSearch.replace(/\D/g, "")))
+                    .slice(0, 20)
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm flex items-center gap-2 transition-colors"
+                        onClick={() => { setForm({ ...form, client_id: String(c.id) }); setClientSearch(""); setClientDropOpen(false); }}
+                      >
+                        <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                          {c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{c.full_name}</div>
+                          {c.phone && <div className="text-xs text-muted-foreground">{c.phone}</div>}
+                        </div>
+                      </button>
+                    ))}
+                  {clientsList.filter(c => !clientSearch.trim() ||
+                    c.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                    (c.phone || "").replace(/\D/g, "").includes(clientSearch.replace(/\D/g, ""))).length === 0 && (
+                    <div className="px-3 py-3 text-sm text-muted-foreground text-center">Ничего не найдено</div>
+                  )}
+                </div>
+              )}
+              {clientDropOpen && <div className="fixed inset-0 z-40" onClick={() => setClientDropOpen(false)} />}
+            </div>
           </Field>
           <Field label="Дата и время *"><input className={inputCls} type="datetime-local" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -916,6 +968,7 @@ function Reports() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editGoal, setEditGoal] = useState<any | null>(null);
   const [goalForm, setGoalForm] = useState({ point: "Находка", goal_amount: "", deadline: "", label: "" });
+  const [goalFilter, setGoalFilter] = useState<string>("all");
 
   useEffect(() => {
     api.reports().then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
@@ -1003,6 +1056,17 @@ function Reports() {
           </button>
         </div>
 
+        {goals.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            {["all", ...Array.from(new Set(goals.map(g => g.point)))].map(p => (
+              <button key={p} onClick={() => setGoalFilter(p)}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${goalFilter === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                {p === "all" ? "Все точки" : p}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!goals.length ? (
           <div className="bg-card rounded-2xl border border-border p-8 text-center">
             <Icon name="Target" size={36} className="text-muted-foreground mx-auto mb-3" />
@@ -1010,7 +1074,7 @@ function Reports() {
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {goals.map(g => {
+            {goals.filter(g => goalFilter === "all" || g.point === goalFilter).map(g => {
               const col = ({"Находка": { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", bar: "#60a5fa", barBg: "bg-blue-100" }, "Волчанец": { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", bar: "#34d399", barBg: "bg-emerald-100" }, "Другая": { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700", bar: "#a78bfa", barBg: "bg-violet-100" }} as Record<string, {bg:string;border:string;text:string;bar:string;barBg:string}>)[g.point] || { bg: "bg-muted", border: "border-border", text: "text-foreground", bar: "#94a3b8", barBg: "bg-muted" };
               const earned = Number(g.earned || 0);
               const goal = Number(g.goal_amount);
