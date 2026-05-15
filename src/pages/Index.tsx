@@ -591,6 +591,9 @@ function Bookings() {
   const [clientSearch, setClientSearch] = useState("");
   const [clientDropOpen, setClientDropOpen] = useState(false);
   const clientSearchRef = useRef<HTMLDivElement>(null);
+  const [showQuickClient, setShowQuickClient] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState({ full_name: "", phone: "" });
+  const [savingQuickClient, setSavingQuickClient] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -600,6 +603,17 @@ function Bookings() {
 
   const calcAmount = (qid: string, hrs: string) => { const q = quadsList.find(q => String(q.id) === qid); return q && hrs ? String(q.hourly_rate * Number(hrs)) : form.amount; };
   const changeStatus = async (id: number, status: string) => { await api.bookings.update(id, { status }); load(); };
+  const saveQuickClient = async () => {
+    if (!quickClientForm.full_name.trim()) return;
+    setSavingQuickClient(true);
+    const created = await api.clients.create(quickClientForm);
+    await Promise.all([api.clients.list()]).then(([c]) => setClientsList(c));
+    setForm(f => ({ ...f, client_id: String(created.id) }));
+    setSavingQuickClient(false);
+    setShowQuickClient(false);
+    setQuickClientForm({ full_name: "", phone: "" });
+    setClientDropOpen(false);
+  };
   const save = async () => {
     if (!form.quad_id || !form.client_id || !form.start_time) return;
     setSaving(true);
@@ -609,7 +623,7 @@ function Bookings() {
     await api.bookings.create({ ...form, quad_id: Number(form.quad_id), client_id: Number(form.client_id), start_time: start.toISOString(), end_time: end.toISOString(), duration_hours: hrs, amount: Number(form.amount), deposit: Number(form.deposit) });
     setSaving(false); setShowModal(false);
     setForm({ quad_id: "", client_id: "", start_time: "", duration_hours: "2", amount: "", deposit: "0", payment_method: "cash", status: "pending", notes: "", point: "" });
-    setClientSearch(""); setClientDropOpen(false);
+    setClientSearch(""); setClientDropOpen(false); setShowQuickClient(false);
     load();
   };
   const remove = async (id: number) => { await api.bookings.remove(id); setDeleteId(null); load(); };
@@ -649,36 +663,84 @@ function Bookings() {
                 {form.client_id && <button type="button" onClick={e => { e.stopPropagation(); setForm({ ...form, client_id: "" }); setClientSearch(""); }} className="text-muted-foreground hover:text-foreground flex-shrink-0"><Icon name="X" size={13} /></button>}
               </div>
               {clientDropOpen && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                  {clientsList
-                    .filter(c => !clientSearch.trim() ||
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+                  <div className="max-h-48 overflow-y-auto">
+                    {clientsList
+                      .filter(c => !clientSearch.trim() ||
+                        c.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                        (c.phone || "").replace(/\D/g, "").includes(clientSearch.replace(/\D/g, "")))
+                      .slice(0, 20)
+                      .map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm flex items-center gap-2 transition-colors"
+                          onClick={() => { setForm({ ...form, client_id: String(c.id) }); setClientSearch(""); setClientDropOpen(false); setShowQuickClient(false); }}
+                        >
+                          <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                            {c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{c.full_name}</div>
+                            {c.phone && <div className="text-xs text-muted-foreground">{c.phone}</div>}
+                          </div>
+                        </button>
+                      ))}
+                    {clientsList.filter(c => !clientSearch.trim() ||
                       c.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                      (c.phone || "").replace(/\D/g, "").includes(clientSearch.replace(/\D/g, "")))
-                    .slice(0, 20)
-                    .map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm flex items-center gap-2 transition-colors"
-                        onClick={() => { setForm({ ...form, client_id: String(c.id) }); setClientSearch(""); setClientDropOpen(false); }}
-                      >
-                        <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                          {c.full_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{c.full_name}</div>
-                          {c.phone && <div className="text-xs text-muted-foreground">{c.phone}</div>}
-                        </div>
-                      </button>
-                    ))}
-                  {clientsList.filter(c => !clientSearch.trim() ||
-                    c.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                    (c.phone || "").replace(/\D/g, "").includes(clientSearch.replace(/\D/g, ""))).length === 0 && (
-                    <div className="px-3 py-3 text-sm text-muted-foreground text-center">Ничего не найдено</div>
+                      (c.phone || "").replace(/\D/g, "").includes(clientSearch.replace(/\D/g, ""))).length === 0 && !showQuickClient && (
+                      <div className="px-3 py-2 text-sm text-muted-foreground text-center">Не найдено</div>
+                    )}
+                  </div>
+
+                  {/* Кнопка / форма быстрого создания */}
+                  {!showQuickClient ? (
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setShowQuickClient(true); setQuickClientForm({ full_name: clientSearch, phone: "" }); }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 border-t border-border transition-colors"
+                    >
+                      <Icon name="UserPlus" size={14} />
+                      Создать нового клиента{clientSearch ? ` «${clientSearch}»` : ""}
+                    </button>
+                  ) : (
+                    <div className="border-t border-border p-3 space-y-2" onClick={e => e.stopPropagation()}>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Новый клиент</div>
+                      <input
+                        autoFocus
+                        className={inputCls}
+                        placeholder="Имя и фамилия *"
+                        value={quickClientForm.full_name}
+                        onChange={e => setQuickClientForm(f => ({ ...f, full_name: e.target.value }))}
+                      />
+                      <input
+                        className={inputCls}
+                        placeholder="Телефон"
+                        value={quickClientForm.phone}
+                        onChange={e => setQuickClientForm(f => ({ ...f, phone: e.target.value }))}
+                      />
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={savingQuickClient || !quickClientForm.full_name.trim()}
+                          onClick={saveQuickClient}
+                          className="flex-1 bg-primary text-primary-foreground text-xs font-medium py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        >
+                          {savingQuickClient ? "Сохранение..." : "Создать и выбрать"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuickClient(false)}
+                          className="px-3 text-xs text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
-              {clientDropOpen && <div className="fixed inset-0 z-40" onClick={() => setClientDropOpen(false)} />}
+              {clientDropOpen && <div className="fixed inset-0 z-40" onClick={() => { setClientDropOpen(false); setShowQuickClient(false); }} />}
             </div>
           </Field>
           <Field label="Дата и время *"><input className={inputCls} type="datetime-local" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></Field>
