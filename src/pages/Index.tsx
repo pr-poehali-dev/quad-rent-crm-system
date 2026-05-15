@@ -1148,9 +1148,9 @@ function PointBudgetBlock({ point, items, onSave, onDelete, saving }: {
       </div>
 
       {/* Ввод кассы и даты */}
-      <div className="flex gap-2 flex-wrap">
-        <input type="date" className={inputCls + " w-36 flex-shrink-0"} value={date} onChange={e => setDate(e.target.value)} />
-        <input className={inputCls + " flex-1 min-w-32"} type="number" placeholder="Дневная касса, ₽" value={cashStr} onChange={e => setCashStr(e.target.value)} />
+      <div className="grid grid-cols-[140px_1fr] gap-2">
+        <input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
+        <input className={inputCls} type="number" placeholder="Дневная касса, ₽" value={cashStr} onChange={e => setCashStr(e.target.value)} />
       </div>
 
       {/* Инструкторы */}
@@ -1162,15 +1162,15 @@ function PointBudgetBlock({ point, items, onSave, onDelete, saving }: {
           </button>
         </div>
         {instructors.map((ins, idx) => (
-          <div key={idx} className="flex gap-2 items-center">
+          <div key={idx} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
             <input
-              className={inputCls + " flex-1"}
+              className={inputCls}
               placeholder="Имя инструктора"
               value={ins.name}
               onChange={e => updateInstructor(idx, "name", e.target.value)}
             />
             <select
-              className={selectCls + " w-44 flex-shrink-0"}
+              className={selectCls + " w-40 flex-shrink-0"}
               value={ins.role}
               onChange={e => updateInstructor(idx, "role", e.target.value as InstructorRole)}
             >
